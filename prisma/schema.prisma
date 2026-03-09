@@ -1,0 +1,271 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// -----------------------------------------------------------------------------
+// TABLAS MAESTRAS (FASE 1)
+// -----------------------------------------------------------------------------
+
+/// Tipos de entidades u operadores que interactúan en el ERP
+enum CompanyType {
+  CLIENT       // Cliente final (Importador/Exportador)
+  AGENT        // Agente de Carga Internacional
+  CUSTOMS      // Agencia de Aduanas
+  TRANSPORTER  // Transportista Local (Camiones)
+  LINE         // Línea Naviera / Aerolínea
+  WAREHOUSE    // Almacén / Depósito Temporal
+  OTHER        // Otros proveedores
+}
+
+enum ProspectingStatus {
+  COLD          /// Recién importado, sin verificar
+  PROSPECTING   /// En la mira, buscando contacto o llamando
+  QUALIFIED     /// Cotizado / Evaluando propuesta
+  CUSTOMER      /// Cliente cerrado (WON)
+  DISQUALIFIED  /// Descartado, no sirve o no le interesa
+}
+
+enum ImportVolume {
+  NEW
+  LOW       // 3-15
+  MED       // 16-30
+  HIGH      // >30
+}
+
+enum ValueDriver {
+  PRICE
+  EXPERIENCE
+  SPEED
+  UNKNOWN
+}
+
+/// Representa a la Entidad / Empresa principal
+model Company {
+  id              String      @id @default(uuid())
+  businessName    String      /// Razón Social (Obligatorio)
+  tradeName       String?     /// Nombre Comercial
+  documentType    String      /// Ej: RUC, DNI, PASSPORT
+  documentNumber  String      @unique /// El número fiscal
+  companyType     CompanyType @default(CLIENT)
+  
+  address         String?
+  website         String?     /// Dominio web de la empresa
+  countryCode     String?     /// Código de país (ISO 3166-1 alpha-2, ej: PE)
+  city            String?
+  legalRepresentative String? /// Representante Legal de la empresa
+  
+  isActive        Boolean     @default(true)
+  annualDams      Int?        /// Cantidad aproximada de DAMs en el último año (Manual)
+  
+  // Datos de Cliente y CRM
+  prospectingStatus ProspectingStatus @default(COLD)
+  disqualificationReason String?      /// Razón por la que se envió al cementerio (solo si status es DISQUALIFIED)
+  importVolume      ImportVolume      @default(NEW)
+  valueDriver       ValueDriver       @default(UNKNOWN)
+  strategyTags      String?         /// Ej: 'Sensible al precio', 'Exige Días Libres'
+  leadScore         Int             @default(0)
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  contacts        Contact[]
+  interactions    Interaction[]
+  opportunities   Opportunity[]
+}
+
+/// Contactos (Personas) asociadas a una Empresa
+model Contact {
+  id              String   @id @default(uuid())
+  companyId       String
+  firstName       String
+  lastName        String
+  emails          String[]    @default([]) /// Permite guardar N cantidad de correos ("juan@g", "ventas@g")
+  phones          String[]    @default([]) /// Celulares / Fijos que luego se descartarán
+  position        String?     /// Cargo (Ej: Gerente, Jefe de Importaciones)
+  
+  // Datos para CRM y Post-venta
+  birthday        DateTime? /// Fecha de cumpleaños
+  anniversary     DateTime? /// Aniversario corporativo o de trabajo
+  interests       String?   /// Gustos o preferencias (Ej: "Fan de la U", "Vino Tinto")
+  notes           String?   /// Notas internas para ejecutivos comerciales
+
+  isActive        Boolean  @default(true)
+  inactiveReason  String?  /// Motivo por el cual el contacto fue descartado (Ej: "Rebotan correos", "Ya no trabaja")
+  engagementScore Int      @default(0)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  interactions    Interaction[]
+}
+
+/// Tipos de puertos / ubicaciones
+enum PortType {
+  SEA     // Marítimo
+  AIR     // Aéreo
+  LAND    // Terrestre
+}
+
+/// Puertos y Aeropuertos
+model Port {
+  id              String   @id @default(uuid())
+  code            String   @unique /// Ej: PEPRU (UN/LOCODE)
+  name            String   /// Nombre del Puerto (Ej: Callao)
+  countryCode     String   /// Ej: PE
+  type            PortType
+  
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+/// Categorías de los servicios prestados o recibidos
+enum ServiceCategory {
+  LOGISTICS       // Fletes, recargos en origen/destino
+  CUSTOMS         // Agenciamiento, trámites aduaneros
+  TRANSPORT       // Flete interno, resguardo
+  WAREHOUSE       // Almacenaje, cuadrilla
+  OTHER
+}
+
+/// Catálogo de Servicios / Conceptos de Facturación
+model Service {
+  id              String          @id @default(uuid())
+  code            String          @unique /// Código interno ERP
+  name            String          /// Ej: Flete Marítimo, Visto Bueno, Agenciamiento
+  category        ServiceCategory
+  defaultPrice    Float?          /// Precio referencial (Opcional)
+  currencyCode    String?         /// Moneda del precio referencial (Ej: USD)
+  
+  isActive        Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  quoteItems      QuoteItem[]
+}
+
+/// Catálogo de Incoterms (Términos de Comercio Internacional)
+model Incoterm {
+  code            String   @id /// Ej: FOB, CIF, EXW
+  description     String   /// Ej: Free On Board
+  category        String   /// Ej: ANY_MODE o SEA_WATER_ONLY
+  isActive        Boolean  @default(true)
+}
+
+/// Catálogo de Partidas Arancelarias (HS Code / Nandina)
+model HSCode {
+  code            String   @id /// Código de la partida (Ej: 8518.30.00.00)
+  description     String   /// Descripción de las mercancías
+  adValorem       Float    @default(0) /// Porcentaje de arancel (0, 4, 6, 11)
+  
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// MÓDULO CRM Y COTIZACIONES (FASE 2)
+// -----------------------------------------------------------------------------
+
+enum InteractionType {
+  EMAIL_SENT
+  EMAIL_OPENED
+  CALL_MADE
+  MEETING
+}
+
+/// Registro de interacciones y Tareas Futuras (Follow-ups)
+model Interaction {
+  id              String            @id @default(uuid())
+  companyId       String
+  contactId       String?           /// A veces no hay un contacto formal aún
+  opportunityId   String?           /// (Fase 2.5) Para enlazar la nota a una Cotización en curso
+  type            InteractionType
+  notes           String?           /// Resumen de lo hablado y datos descubiertos
+  scoreImpact     Int               @default(0) /// Ej: +5, -2, +20
+  interactedAt    DateTime          @default(now()) /// Cuando paso la accion
+  
+  // Tiempos y Recordatorios
+  nextFollowUpDate    DateTime?     /// Tarea futura
+  isFollowUpCompleted Boolean       @default(false) /// Si ya se hizo la tarea
+  
+  createdAt       DateTime          @default(now())
+  
+  company         Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact         Contact?          @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  opportunity     Opportunity?      @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+}
+
+enum OpportunityStage {
+  PROSPECTING
+  QUOTING
+  NEGOTIATING
+  WON
+  LOST
+}
+
+/// Oportunidad de Venta (Pipeline)
+model Opportunity {
+  id              String            @id @default(uuid())
+  companyId       String
+  title           String            /// Ej: FCL China-Callao
+  stage           OpportunityStage  @default(PROSPECTING)
+  lossReason      String?           @db.Text
+  expectedValue   Float?
+  expectedCurrency String?          @default("USD")
+  closeDate       DateTime?
+  
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  company         Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  quotes          Quote[]
+  interactions    Interaction[]
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+}
+
+/// Cotizador
+model Quote {
+  id              String            @id @default(uuid())
+  opportunityId   String
+  quoteNumber     String            @unique /// Ej: COT-2026-001
+  status          QuoteStatus       @default(DRAFT)
+  validUntil      DateTime?
+  
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  opportunity     Opportunity       @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  items           QuoteItem[]
+}
+
+/// Detalle de la cotización vinculado a los Servicios base
+model QuoteItem {
+  id              String            @id @default(uuid())
+  quoteId         String
+  serviceId       String
+  quantity        Float             @default(1)
+  unitPrice       Float
+  totalPrice      Float   /// quantity * unitPrice
+  
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  quote           Quote             @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  service         Service           @relation(fields: [serviceId], references: [id])
+}
