@@ -1,4 +1,5 @@
-import { Bell, Search, User } from "lucide-react";
+import { Bell, Search } from "lucide-react";
+import { UserButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -24,9 +25,7 @@ export function Topbar() {
                         <span className="text-sm font-medium leading-none">Operador A.</span>
                         <span className="text-xs text-muted-foreground mt-1">Agencia de Carga</span>
                     </div>
-                    <Button variant="secondary" size="icon" className="rounded-full">
-                        <User className="h-5 w-5" />
-                    </Button>
+                    <UserButton />
                 </div>
             </div>
         </header>

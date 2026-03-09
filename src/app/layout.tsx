@@ -1,3 +1,4 @@
+import { ClerkProvider } from '@clerk/nextjs'
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -28,21 +29,23 @@ export default function RootLayout({
   modal: React.ReactNode;
 }>) {
   return (
-    <html lang="es" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <div className="flex min-h-screen bg-muted/40 text-foreground">
-          <Sidebar />
-          <div className="flex w-full flex-col lg:pl-0">
-            <Topbar />
-            <main className="flex-1 overflow-auto p-4 md:p-6 lg:p-8">
-              {children}
-            </main>
+    <ClerkProvider>
+      <html lang="es" suppressHydrationWarning>
+        <body
+          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        >
+          <div className="flex min-h-screen bg-muted/40 text-foreground">
+            <Sidebar />
+            <div className="flex w-full flex-col lg:pl-0">
+              <Topbar />
+              <main className="flex-1 overflow-auto p-4 md:p-6 lg:p-8">
+                {children}
+              </main>
+            </div>
+            {modal}
           </div>
-          {modal}
-        </div>
-      </body>
-    </html>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
