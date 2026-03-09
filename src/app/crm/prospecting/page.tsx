@@ -61,18 +61,19 @@ export default function ProspectingInboxPage() {
             const nextTask = pendingFollowUps.length > 0 ? pendingFollowUps[0] : null;
 
             // Sanitizar fecha para comparación ISO YYYY-MM-DD
-            if (nextTask) {
-                nextTask.formattedDate = new Date(nextTask.nextFollowUpDate).toISOString().split('T')[0];
+            let nextTaskFormattedDate = null;
+            if (nextTask && nextTask.nextFollowUpDate) {
+                nextTaskFormattedDate = new Date(nextTask.nextFollowUpDate).toISOString().split('T')[0];
             }
 
-            return { company, lastInteraction, nextTask, allInteractions: ints };
+            return { company, lastInteraction, nextTask, allInteractions: ints, nextTaskFormattedDate };
         });
     }, [companiesList]);
 
     // Segmentación orientada a tareas
     const nuevos = companiesWithData.filter((c: any) => !c.lastInteraction && !c.nextTask);
-    const paraHoyAtrasadas = companiesWithData.filter((c: any) => c.nextTask && c.nextTask.formattedDate <= todayDate);
-    const futuras = companiesWithData.filter((c: any) => c.nextTask && c.nextTask.formattedDate > todayDate);
+    const paraHoyAtrasadas = companiesWithData.filter((c: any) => c.nextTaskFormattedDate && c.nextTaskFormattedDate <= todayDate);
+    const futuras = companiesWithData.filter((c: any) => c.nextTaskFormattedDate && c.nextTaskFormattedDate > todayDate);
     const sinSeguimientoActivo = companiesWithData.filter((c: any) => c.lastInteraction && !c.nextTask);
 
     const renderTable = (data: typeof companiesWithData, emptyMessage: string) => (
@@ -95,11 +96,11 @@ export default function ProspectingInboxPage() {
                             </TableCell>
                         </TableRow>
                     ) : (
-                        data.map(({ company, lastInteraction, nextTask, allInteractions }) => {
+                        data.map(({ company, lastInteraction, nextTask, allInteractions, nextTaskFormattedDate }) => {
                             const companyContacts = company.contacts?.filter((c: any) => (c.emails && c.emails.length > 0) || (c.phones && c.phones.length > 0)) || [];
 
-                            const isOverdue = nextTask && nextTask.formattedDate < todayDate;
-                            const isToday = nextTask && nextTask.formattedDate === todayDate;
+                            const isOverdue = nextTaskFormattedDate && nextTaskFormattedDate < todayDate;
+                            const isToday = nextTaskFormattedDate && nextTaskFormattedDate === todayDate;
                             const isExpanded = expandedCompanies.has(company.id);
 
                             const interactionTypeLabel = (t: string) => {
@@ -193,7 +194,7 @@ export default function ProspectingInboxPage() {
                                                             {isOverdue && <AlertCircle className="h-3 w-3 mr-1" />}
                                                             {isToday && <Clock className="h-3 w-3 mr-1" />}
                                                             {!isOverdue && !isToday && <Calendar className="h-3 w-3 mr-1" />}
-                                                            {isOverdue ? `Atrasado: ${nextTask.formattedDate}` : isToday ? 'Toca Hoy' : `Próximo: ${nextTask.formattedDate}`}
+                                                            {isOverdue ? `Atrasado: ${nextTaskFormattedDate}` : isToday ? 'Toca Hoy' : `Próximo: ${nextTaskFormattedDate}`}
                                                         </span>
                                                         <span className="text-[10px] text-muted-foreground truncate max-w-[150px]">
                                                             Últ. nota: {lastInteraction?.notes || "Ninguna"}

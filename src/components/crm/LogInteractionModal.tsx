@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { type Contact } from "@/lib/mock-data";
 import { createInteraction } from "@/app/actions/crm/interaction-actions";
 import type { InteractionType } from "@prisma/client";
 import { Button } from "@/components/ui/button";
@@ -29,7 +28,7 @@ import { PhoneCall } from "lucide-react";
 interface LogInteractionModalProps {
     companyId: string;
     opportunityId?: string;
-    contacts: Contact[];
+    contacts: any[];
     onSuccess?: () => void;
     triggerButton?: React.ReactNode;
 }
