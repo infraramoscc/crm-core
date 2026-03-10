@@ -19,14 +19,22 @@ export function TaskNotificationsBell() {
     const [tasks, setTasks] = useState<any[]>([]);
     const [open, setOpen] = useState(false);
 
+    const fetchTasks = async () => {
+        const result = await getPendingTasks();
+        if (result.success && result.data) {
+            setTasks(result.data);
+        }
+    };
+
     useEffect(() => {
         let mounted = true;
+
         const doFetch = async () => {
-            const result = await getPendingTasks();
-            if (mounted && result.success && result.data) {
-                setTasks(result.data);
+            if (mounted) {
+                await fetchTasks();
             }
         };
+
         doFetch();
         const interval = setInterval(doFetch, 5 * 60 * 1000);
         return () => {
