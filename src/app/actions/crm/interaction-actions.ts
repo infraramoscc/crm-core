@@ -16,7 +16,8 @@ export async function createInteraction(data: {
     notes: string;
     scoreImpact?: number;
     interactedAt?: string; // ISO date string
-    nextFollowUpDate?: string; // ISO date string
+    nextFollowUpDate?: string; // ISO date string (including time)
+    followUpType?: "CALL" | "EMAIL" | "MEETING" | "LINKEDIN" | "WHATSAPP" | "OTHER";
 }) {
     try {
         const interaction = await prisma.interaction.create({
@@ -29,6 +30,7 @@ export async function createInteraction(data: {
                 scoreImpact: data.scoreImpact || 0,
                 interactedAt: data.interactedAt ? new Date(data.interactedAt) : new Date(),
                 nextFollowUpDate: data.nextFollowUpDate ? new Date(data.nextFollowUpDate) : null,
+                followUpType: data.followUpType || null,
                 isFollowUpCompleted: false,
             }
         });

@@ -11,6 +11,7 @@ export async function createContact(data: {
     emails?: string[];
     phones?: string[];
     position?: string;
+    linkedin?: string;
     isActive?: boolean;
     inactiveReason?: string;
 }) {
@@ -23,6 +24,7 @@ export async function createContact(data: {
                 emails: data.emails || [],
                 phones: data.phones || [],
                 position: data.position || "",
+                linkedin: data.linkedin || "",
                 isActive: data.isActive ?? true,
                 inactiveReason: data.inactiveReason || null
             }
@@ -123,9 +125,17 @@ export async function deleteContactInfo(contactId: string, type: 'email' | 'phon
 export async function getAllContacts() {
     try {
         const contacts = await prisma.contact.findMany({
-            include: {
+            select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                companyId: true,
+                position: true,
+                emails: true,
+                phones: true,
+                isActive: true,
                 company: {
-                    select: { id: true, businessName: true }
+                    select: { businessName: true }
                 }
             },
             orderBy: { createdAt: 'desc' }
@@ -164,6 +174,7 @@ export async function updateContact(id: string, data: {
     emails?: string[];
     phones?: string[];
     position?: string;
+    linkedin?: string;
     isActive?: boolean;
     inactiveReason?: string;
 }) {
@@ -177,6 +188,7 @@ export async function updateContact(id: string, data: {
                 emails: data.emails,
                 phones: data.phones,
                 position: data.position,
+                linkedin: data.linkedin,
                 isActive: data.isActive,
                 inactiveReason: data.inactiveReason
             }

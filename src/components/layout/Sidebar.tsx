@@ -15,6 +15,7 @@ import {
   Search,
   PhoneCall,
   UploadCloud,
+  CalendarClock,
 } from "lucide-react";
 
 const navItems = [
@@ -26,6 +27,7 @@ const navItems = [
   { href: "/crm/import", label: "Importar Base (Excel)", icon: UploadCloud },
   { href: "/crm/investigation", label: "Investigación", icon: Search },
   { href: "/crm/prospecting", label: "Cacería (Prospección)", icon: PhoneCall },
+  { href: "/crm/tasks", label: "Mis Tareas", icon: CalendarClock },
   { href: "/crm", label: "Pipeline (Negocios)", icon: Briefcase },
   { href: "/tracking", label: "Seguimiento", icon: Truck },
 ];

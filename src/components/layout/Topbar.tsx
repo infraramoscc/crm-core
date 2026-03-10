@@ -1,7 +1,7 @@
-import { Bell, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TaskNotificationsBell } from "./TaskNotificationsBell";
 
 export function Topbar() {
     return (
@@ -17,9 +17,7 @@ export function Topbar() {
                 </div>
             </div>
             <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" className="group">
-                    <Bell className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
-                </Button>
+                <TaskNotificationsBell />
                 <div className="flex items-center gap-2 border-l pl-4 ml-2">
                     <div className="flex flex-col items-end">
                         <span className="text-sm font-medium leading-none">Operador A.</span>

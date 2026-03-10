@@ -51,6 +51,7 @@ export function ContactForm({ initialData, companies = [] }: ContactFormProps) {
                 firstName: formData.get("firstName") as string,
                 lastName: formData.get("lastName") as string,
                 position: formData.get("position") as string,
+                linkedin: formData.get("linkedin") as string,
                 emails: parsedEmails,
                 phones: parsedPhones,
                 isActive,
@@ -70,6 +71,7 @@ export function ContactForm({ initialData, companies = [] }: ContactFormProps) {
                     firstName: formData.get("firstName") as string,
                     lastName: formData.get("lastName") as string,
                     position: formData.get("position") as string,
+                    linkedin: formData.get("linkedin") as string,
                     emails: parsedEmails,
                     phones: parsedPhones,
                     isActive,
@@ -105,7 +107,7 @@ export function ContactForm({ initialData, companies = [] }: ContactFormProps) {
                             <TabsTrigger value="crm">CRM & Post-venta</TabsTrigger>
                         </TabsList>
 
-                        <TabsContent value="general" className="space-y-6">
+                        <TabsContent value="general" className="space-y-6 min-h-[450px]">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
                                     <Label htmlFor="firstName">Nombres *</Label>
@@ -150,6 +152,15 @@ export function ContactForm({ initialData, companies = [] }: ContactFormProps) {
                                         name="position"
                                         defaultValue={initialData?.position}
                                         placeholder="Ej. Gerente de Importaciones"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="linkedin">Perfil de LinkedIn</Label>
+                                    <Input
+                                        id="linkedin"
+                                        name="linkedin"
+                                        defaultValue={initialData?.linkedin}
+                                        placeholder="https://linkedin.com/in/..."
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -204,7 +215,7 @@ export function ContactForm({ initialData, companies = [] }: ContactFormProps) {
                             </div>
                         </TabsContent>
 
-                        <TabsContent value="crm" className="space-y-6">
+                        <TabsContent value="crm" className="space-y-6 min-h-[450px]">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
                                     <Label htmlFor="birthday">Fecha de Cumpleaños</Label>

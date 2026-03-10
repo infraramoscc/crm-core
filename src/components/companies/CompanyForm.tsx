@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, Mail, Phone, User } from "lucide-react";
+import { Plus, Mail, Phone, User, History, MessageSquareText, PhoneCall, Calendar } from "lucide-react";
 import { createCompany, updateCompany } from "@/app/actions/crm/company-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,9 +75,10 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
                     <TabsTrigger value="crm" disabled={!isEditing}>Perfil Comercial (CRM)</TabsTrigger>
                     <TabsTrigger value="aduanas" disabled={!isEditing}>Métricas / Aduanas</TabsTrigger>
                     <TabsTrigger value="contacts" disabled={!isEditing}>Contactos asociados</TabsTrigger>
+                    <TabsTrigger value="history" disabled={!isEditing}>Historial de Actividad</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="general">
+                <TabsContent value="general" className="min-h-[450px]">
                     <Card>
                         <CardHeader>
                             <CardTitle>Datos Generales</CardTitle>
@@ -189,7 +190,7 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
                     </Card>
                 </TabsContent>
 
-                <TabsContent value="crm">
+                <TabsContent value="crm" className="min-h-[450px]">
                     <Card>
                         <CardHeader>
                             <CardTitle>Perfil Comercial</CardTitle>
@@ -244,7 +245,7 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
                     </Card>
                 </TabsContent>
 
-                <TabsContent value="aduanas">
+                <TabsContent value="aduanas" className="min-h-[450px]">
                     <Card>
                         <CardHeader>
                             <CardTitle>Métricas y Aduanas</CardTitle>
@@ -273,7 +274,7 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
                     </Card>
                 </TabsContent>
 
-                <TabsContent value="contacts">
+                <TabsContent value="contacts" className="min-h-[450px]">
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between">
                             <div>
@@ -324,6 +325,113 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
                                             </div>
                                         </div>
                                     ))}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="history" className="min-h-[450px]">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Historial de Actividad</CardTitle>
+                            <CardDescription>
+                                Registro cronológico de todas las interacciones, llamadas, correos y reuniones con este cliente.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {(!initialData?.interactions || initialData.interactions.length === 0) ? (
+                                <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-lg bg-muted/20">
+                                    <MessageSquareText className="h-8 w-8 text-muted-foreground mb-3 opacity-50" />
+                                    <h3 className="text-lg font-medium">Sin interacciones registradas</h3>
+                                    <p className="text-sm text-muted-foreground mt-1 max-w-md">
+                                        No hay un historial de llamadas, correos o reuniones asociadas a esta empresa todavía. Registra la primera interacción desde el Pipeline o Prospección.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-6">
+                                    <div className="relative border-l-2 border-primary/20 ml-3 space-y-6">
+                                        {initialData.interactions.map((interaction: any, idx: number) => {
+                                            const renderIcon = (type: string, className: string) => {
+                                                switch (type) {
+                                                    case 'CALL_MADE': return <PhoneCall className={className} />;
+                                                    case 'EMAIL_SENT': return <Mail className={className} />;
+                                                    case 'EMAIL_OPENED': return <Mail className={className} />;
+                                                    case 'MEETING': return <User className={className} />;
+                                                    default: return <MessageSquareText className={className} />;
+                                                }
+                                            };
+
+                                            const getLabel = (type: string) => {
+                                                switch (type) {
+                                                    case 'CALL_MADE': return 'Llamada';
+                                                    case 'EMAIL_SENT': return 'Correo Enviado';
+                                                    case 'EMAIL_OPENED': return 'Correo Abierto';
+                                                    case 'MEETING': return 'Reunión / Visita';
+                                                    default: return type;
+                                                }
+                                            };
+
+                                            return (
+                                                <div key={interaction.id} className="relative pl-6 group">
+                                                    {/* Timeline Node */}
+                                                    <div className={`absolute -left-[11px] top-1 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors
+                                                        ${idx === 0 ? 'bg-primary border-primary text-white scale-110 shadow-sm' : 'bg-background border-muted-foreground/40 text-muted-foreground group-hover:border-primary/50'}`}>
+                                                        {renderIcon(interaction.type, "h-2.5 w-2.5")}
+                                                    </div>
+
+                                                    {/* Content */}
+                                                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 p-4 rounded-lg border bg-card/50 hover:bg-card transition-colors">
+                                                        <div className="space-y-2 flex-1">
+                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                <span className="font-semibold text-sm">{getLabel(interaction.type)}</span>
+                                                                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                                                                    {new Date(interaction.interactedAt).toLocaleDateString('es-PE', {
+                                                                        weekday: 'long', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                                                                    })}
+                                                                </span>
+                                                                {interaction.scoreImpact > 0 && (
+                                                                    <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                                                                        +{interaction.scoreImpact} termómetro
+                                                                    </span>
+                                                                )}
+                                                            </div>
+
+                                                            {interaction.notes ? (
+                                                                <p className="text-sm bg-muted/40 p-3 rounded-md text-foreground leading-relaxed whitespace-pre-wrap">
+                                                                    {interaction.notes}
+                                                                </p>
+                                                            ) : (
+                                                                <p className="text-sm text-muted-foreground italic">Sin notas detalladas.</p>
+                                                            )}
+
+                                                            <div className="flex flex-wrap gap-2 text-xs mt-3 border-t pt-3">
+                                                                {interaction.contact && (
+                                                                    <div className="flex items-center gap-1.5 text-muted-foreground bg-muted/30 px-2 py-1 rounded-md">
+                                                                        <User className="h-3 w-3" />
+                                                                        <span>Con {interaction.contact.firstName} {interaction.contact.lastName}</span>
+                                                                    </div>
+                                                                )}
+
+                                                                {interaction.nextFollowUpDate && (
+                                                                    <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md ${interaction.isFollowUpCompleted
+                                                                        ? 'text-muted-foreground bg-muted/30 line-through'
+                                                                        : 'text-amber-700 bg-amber-50 font-medium'
+                                                                        }`}>
+                                                                        <Calendar className="h-3 w-3" />
+                                                                        <span>
+                                                                            Seguimiento: {new Date(interaction.nextFollowUpDate).toLocaleDateString('es-PE')}
+                                                                            {interaction.isFollowUpCompleted && ' (Completado)'}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             )}
                         </CardContent>

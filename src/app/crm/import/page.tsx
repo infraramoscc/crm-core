@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // Server Action
 import { upsertCompanyFromImport } from "@/app/actions/crm/company-actions";
@@ -29,6 +30,7 @@ export default function ImportProspectsPage() {
     const [headers, setHeaders] = useState<string[]>([]);
     const [fileName, setFileName] = useState("");
     const [progress, setProgress] = useState(0);
+    const [encoding, setEncoding] = useState("ISO-8859-1");
 
     const onDrop = useCallback((acceptedFiles: File[]) => {
         const file = acceptedFiles[0];
@@ -38,6 +40,7 @@ export default function ImportProspectsPage() {
             Papa.parse(file, {
                 header: true,
                 skipEmptyLines: true,
+                encoding: encoding,
                 complete: (results) => {
                     setHeaders(results.meta.fields || []);
                     setData(results.data as ParsedRow[]);
@@ -49,7 +52,7 @@ export default function ImportProspectsPage() {
                 }
             });
         }
-    }, []);
+    }, [encoding]);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
@@ -153,8 +156,22 @@ export default function ImportProspectsPage() {
                                 Columnas Req: "RUC", "Razon_Social". Opcionales: "DAMs_Anuales", "Representante_Legal", "Email_Contacto"...
                             </p>
 
-                            <div className="mt-6">
-                                <Button type="button" variant="outline">Buscar archivo</Button>
+                            <div className="mt-4 flex flex-col items-center gap-4">
+                                <div className="flex items-center gap-3 z-10" onClick={(e) => e.stopPropagation()}>
+                                    <span className="text-sm font-medium whitespace-nowrap">Codificación:</span>
+                                    <Select value={encoding} onValueChange={setEncoding}>
+                                        <SelectTrigger className="w-[180px] h-9">
+                                            <SelectValue placeholder="Selecciona..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="ISO-8859-1">Excel (ISO-8859-1)</SelectItem>
+                                            <SelectItem value="UTF-8">Estándar (UTF-8)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="mt-2 text-center pointer-events-none">
+                                    <Button type="button" variant="outline" className="pointer-events-none">Buscar archivo</Button>
+                                </div>
                             </div>
                         </div>
                     </CardContent>

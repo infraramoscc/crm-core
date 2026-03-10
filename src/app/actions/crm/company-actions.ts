@@ -99,16 +99,37 @@ export async function getCompaniesByStatus(statuses: ProspectingStatus[]) {
                     in: statuses
                 }
             },
-            include: {
-                contacts: true,
+            select: {
+                id: true,
+                documentNumber: true,
+                businessName: true,
+                importVolume: true,
+                valueDriver: true,
+                leadScore: true,
+                contacts: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        phones: true,
+                        emails: true
+                    }
+                },
                 interactions: {
                     orderBy: { interactedAt: 'desc' },
-                    include: {
+                    select: {
+                        id: true,
+                        type: true,
+                        interactedAt: true,
+                        scoreImpact: true,
+                        notes: true,
+                        nextFollowUpDate: true,
+                        isFollowUpCompleted: true,
                         contact: { select: { firstName: true, lastName: true } }
                     }
                 },
                 opportunities: {
-                    select: { id: true, title: true, stage: true }
+                    select: { id: true }
                 }
             },
             orderBy: {
@@ -196,8 +217,16 @@ export async function updateCompanyStatus(
 export async function getAllCompanies() {
     try {
         const companies = await prisma.company.findMany({
-            include: {
-                contacts: true,
+            select: {
+                id: true,
+                businessName: true,
+                tradeName: true,
+                documentType: true,
+                documentNumber: true,
+                companyType: true,
+                city: true,
+                countryCode: true,
+                isActive: true
             },
             orderBy: { createdAt: 'desc' }
         });

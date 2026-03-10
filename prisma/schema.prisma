@@ -89,6 +89,7 @@ model Contact {
   emails          String[]    @default([]) /// Permite guardar N cantidad de correos ("juan@g", "ventas@g")
   phones          String[]    @default([]) /// Celulares / Fijos que luego se descartarán
   position        String?     /// Cargo (Ej: Gerente, Jefe de Importaciones)
+  linkedin        String?     /// Link de LinkedIn del contacto
   
   // Datos para CRM y Post-venta
   birthday        DateTime? /// Fecha de cumpleaños
@@ -180,6 +181,18 @@ enum InteractionType {
   EMAIL_OPENED
   CALL_MADE
   MEETING
+  LINKEDIN_CONNECT
+  LINKEDIN_MESSAGE
+  SYSTEM_NOTE
+}
+
+enum FollowUpType {
+  CALL
+  EMAIL
+  MEETING
+  LINKEDIN
+  WHATSAPP
+  OTHER
 }
 
 /// Registro de interacciones y Tareas Futuras (Follow-ups)
@@ -194,7 +207,8 @@ model Interaction {
   interactedAt    DateTime          @default(now()) /// Cuando paso la accion
   
   // Tiempos y Recordatorios
-  nextFollowUpDate    DateTime?     /// Tarea futura
+  nextFollowUpDate    DateTime?     /// Tarea futura con hora exacta
+  followUpType        FollowUpType? /// Tipo de tarea a realizar
   isFollowUpCompleted Boolean       @default(false) /// Si ya se hizo la tarea
   
   createdAt       DateTime          @default(now())

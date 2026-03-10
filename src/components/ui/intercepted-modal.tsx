@@ -25,7 +25,7 @@ export function InterceptedModal({
         <Dialog open={open} onOpenChange={(isOpen) => {
             if (!isOpen) onDismiss();
         }}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="w-[95vw] !max-w-5xl md:w-[80vw] lg:w-[70vw] max-h-[90vh] overflow-y-auto duration-200">
                 <DialogTitle className="sr-only">
                     {title || "Formulario"}
                 </DialogTitle>
