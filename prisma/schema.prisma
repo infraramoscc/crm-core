@@ -24,6 +24,14 @@ enum CompanyType {
   OTHER // Otros proveedores
 }
 
+/// Rol comercial de la empresa en operaciones de comercio exterior
+enum TradeRole {
+  IMPORTER
+  EXPORTER
+  BOTH
+  NONE
+}
+
 enum ProspectingStatus {
   COLD /// Recién importado, sin verificar
   PROSPECTING /// En la mira, buscando contacto o llamando
@@ -54,6 +62,7 @@ model Company {
   documentType   String /// Ej: RUC, DNI, PASSPORT
   documentNumber String      @unique /// El número fiscal
   companyType    CompanyType @default(CLIENT)
+  tradeRole      TradeRole   @default(NONE)
 
   address             String?
   website             String? /// Dominio web de la empresa

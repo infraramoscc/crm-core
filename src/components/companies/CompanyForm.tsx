@@ -40,11 +40,15 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
             documentType: documentType,
             documentNumber: formData.get('documentNumber') as string,
             companyType: companyType as any,
+            tradeRole: formData.get('tradeRole') as any,
             annualDams: formData.get('annualDams') ? parseInt(formData.get('annualDams') as string, 10) : undefined,
             legalRepresentative: (formData.get('legalRepresentative') as string) || undefined,
+            address: (formData.get('address') as string) || undefined,
+            city: (formData.get('city') as string) || undefined,
+            countryCode: (formData.get('countryCode') as string) || undefined,
             // CRM Data
-            importVolume: formData.get('importVolume') || undefined,
-            valueDriver: formData.get('valueDriver') || undefined,
+            importVolume: (formData.get('importVolume') as any) || undefined,
+            valueDriver: (formData.get('valueDriver') as any) || undefined,
             strategyTags: (formData.get('strategyTags') as string) || undefined,
         };
 
@@ -58,8 +62,31 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
         setLoading(false);
 
         if (result.success) {
-            router.back();
-            router.refresh(); // Para refrescar la tabla que quedó atrás
+            if (!isEditing) {
+                // Si es creación, regresamos
+                router.back();
+            } else {
+                // Si es edición, nos quedamos en el modal pero avisamos al usuario
+                const triggerAlert = document.createElement("div");
+                triggerAlert.style.position = "fixed";
+                triggerAlert.style.bottom = "20px";
+                triggerAlert.style.right = "20px";
+                triggerAlert.style.backgroundColor = "#10b981"; // emerald-500
+                triggerAlert.style.color = "white";
+                triggerAlert.style.padding = "12px 24px";
+                triggerAlert.style.borderRadius = "8px";
+                triggerAlert.style.zIndex = "9999";
+                triggerAlert.style.boxShadow = "0 4px 6px -1px rgba(0, 0, 0, 0.1)";
+                triggerAlert.style.transition = "opacity 0.3s ease-in-out";
+                triggerAlert.innerText = "Empresa actualizada con éxito";
+                document.body.appendChild(triggerAlert);
+                
+                setTimeout(() => {
+                    triggerAlert.style.opacity = "0";
+                    setTimeout(() => triggerAlert.remove(), 300);
+                }, 3000);
+            }
+            router.refresh(); // Para refrescar la tabla de fondo
         } else {
             alert(`Error ${isEditing ? 'editando' : 'creando'} la empresa: ` + (result.error || "Desconocido"));
         }
@@ -78,7 +105,7 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
                     <TabsTrigger value="history" disabled={!isEditing}>Historial de Actividad</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="general" className="min-h-[450px]">
+                <TabsContent value="general" forceMount className="data-[state=inactive]:hidden min-h-[450px]">
                     <Card>
                         <CardHeader>
                             <CardTitle>Datos Generales</CardTitle>
@@ -159,6 +186,21 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
                                         </SelectContent>
                                     </Select>
                                 </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="tradeRole">Rol Comercial</Label>
+                                    <Select name="tradeRole" defaultValue={initialData?.tradeRole || "NONE"}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Selecciona el rol" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="NONE">Ninguno / No Aplica</SelectItem>
+                                            <SelectItem value="IMPORTER">Importador</SelectItem>
+                                            <SelectItem value="EXPORTER">Exportador</SelectItem>
+                                            <SelectItem value="BOTH">Importador y Exportador</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </div>
 
                             <div className="border-t pt-6 mt-6 !mt-6 space-y-6">
@@ -168,18 +210,20 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
                                         <Label htmlFor="address">Dirección Legal</Label>
                                         <Input
                                             id="address"
+                                            name="address"
                                             defaultValue={initialData?.address}
                                             placeholder="Ej. Av. Principal 123"
                                         />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="city">Ciudad / Provincia</Label>
-                                        <Input id="city" defaultValue={initialData?.city} placeholder="Ej. Lima" />
+                                        <Input id="city" name="city" defaultValue={initialData?.city} placeholder="Ej. Lima" />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="countryCode">País (Código ISO)</Label>
                                         <Input
                                             id="countryCode"
+                                            name="countryCode"
                                             defaultValue={initialData?.countryCode || "PE"}
                                             placeholder="Ej. PE"
                                         />
@@ -190,7 +234,7 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
                     </Card>
                 </TabsContent>
 
-                <TabsContent value="crm" className="min-h-[450px]">
+                <TabsContent value="crm" forceMount className="data-[state=inactive]:hidden min-h-[450px]">
                     <Card>
                         <CardHeader>
                             <CardTitle>Perfil Comercial</CardTitle>
@@ -245,7 +289,7 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
                     </Card>
                 </TabsContent>
 
-                <TabsContent value="aduanas" className="min-h-[450px]">
+                <TabsContent value="aduanas" forceMount className="data-[state=inactive]:hidden min-h-[450px]">
                     <Card>
                         <CardHeader>
                             <CardTitle>Métricas y Aduanas</CardTitle>

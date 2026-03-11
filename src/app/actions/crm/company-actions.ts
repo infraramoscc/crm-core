@@ -2,19 +2,23 @@
 
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
-import type { CompanyType, ProspectingStatus, ValueDriver } from "@prisma/client";
+import type { CompanyType, ProspectingStatus, ValueDriver, ImportVolume, TradeRole } from "@prisma/client";
 
 export async function createCompany(data: {
     documentNumber: string;
-    documentType?: string;
+    documentType: string;
     businessName: string;
     tradeName?: string;
     website?: string;
     companyType?: CompanyType;
+    tradeRole?: TradeRole;
     isActive?: boolean;
     annualDams?: number;
     prospectingStatus?: ProspectingStatus;
     legalRepresentative?: string;
+    importVolume?: ImportVolume;
+    valueDriver?: ValueDriver;
+    strategyTags?: string;
 }) {
     try {
         const company = await prisma.company.create({
@@ -25,10 +29,14 @@ export async function createCompany(data: {
                 tradeName: data.tradeName,
                 website: data.website || null,
                 companyType: data.companyType || "CLIENT",
+                tradeRole: data.tradeRole || "NONE",
                 isActive: data.isActive ?? true,
                 annualDams: data.annualDams || null,
                 prospectingStatus: data.prospectingStatus || "COLD",
                 legalRepresentative: data.legalRepresentative || null,
+                importVolume: data.importVolume || "NEW",
+                valueDriver: data.valueDriver || "UNKNOWN",
+                strategyTags: data.strategyTags || null,
             }
         });
 
@@ -55,6 +63,10 @@ export async function upsertCompanyFromImport(data: {
     annualDams?: number;
     prospectingStatus?: ProspectingStatus;
     legalRepresentative?: string;
+    tradeRole?: TradeRole;
+    importVolume?: ImportVolume;
+    valueDriver?: ValueDriver;
+    strategyTags?: string;
 }) {
     try {
         const company = await prisma.company.upsert({
@@ -68,6 +80,10 @@ export async function upsertCompanyFromImport(data: {
                 ...(data.website && { website: data.website }),
                 ...(data.annualDams && { annualDams: data.annualDams }),
                 ...(data.legalRepresentative && { legalRepresentative: data.legalRepresentative }),
+                ...(data.tradeRole && { tradeRole: data.tradeRole }),
+                ...(data.importVolume && { importVolume: data.importVolume }),
+                ...(data.valueDriver && { valueDriver: data.valueDriver }),
+                ...(data.strategyTags && { strategyTags: data.strategyTags }),
             },
             create: {
                 documentNumber: data.documentNumber,
@@ -76,10 +92,14 @@ export async function upsertCompanyFromImport(data: {
                 tradeName: data.tradeName,
                 website: data.website || null,
                 companyType: data.companyType || "CLIENT",
+                tradeRole: data.tradeRole || "NONE",
                 isActive: data.isActive ?? true,
                 annualDams: data.annualDams || null,
                 prospectingStatus: data.prospectingStatus || "COLD",
                 legalRepresentative: data.legalRepresentative || null,
+                importVolume: data.importVolume || "NEW",
+                valueDriver: data.valueDriver || "UNKNOWN",
+                strategyTags: data.strategyTags || null,
             }
         });
 
@@ -267,10 +287,17 @@ export async function updateCompany(id: string, data: {
     tradeName?: string;
     website?: string;
     companyType?: CompanyType;
+    tradeRole?: any;
     isActive?: boolean;
     annualDams?: number;
+    importVolume?: any;
+    valueDriver?: any;
+    strategyTags?: string;
     prospectingStatus?: ProspectingStatus;
     legalRepresentative?: string;
+    address?: string;
+    city?: string;
+    countryCode?: string;
 }) {
     try {
         const company = await prisma.company.update({
@@ -282,9 +309,17 @@ export async function updateCompany(id: string, data: {
                 tradeName: data.tradeName,
                 website: data.website,
                 companyType: data.companyType,
+                tradeRole: data.tradeRole,
                 isActive: data.isActive,
                 annualDams: data.annualDams,
+                importVolume: data.importVolume,
+                valueDriver: data.valueDriver,
+                strategyTags: data.strategyTags,
                 prospectingStatus: data.prospectingStatus,
+                legalRepresentative: data.legalRepresentative,
+                address: data.address,
+                city: data.city,
+                countryCode: data.countryCode,
             }
         });
 
