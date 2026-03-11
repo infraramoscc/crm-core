@@ -35,6 +35,8 @@ export async function createCompany(data: {
         revalidatePath("/crm/investigation");
         revalidatePath("/crm/prospecting");
         revalidatePath("/crm");
+        revalidatePath("/companies");
+        revalidatePath("/contacts", "layout");
         return { success: true, data: company };
     } catch (error) {
         console.error("Error creating company:", error);
@@ -84,6 +86,8 @@ export async function upsertCompanyFromImport(data: {
         revalidatePath("/crm/investigation");
         revalidatePath("/crm/prospecting");
         revalidatePath("/crm");
+        revalidatePath("/companies");
+        revalidatePath("/contacts", "layout");
         return { success: true, data: company };
     } catch (error) {
         console.error("Error upserting company from import:", error);
@@ -112,7 +116,8 @@ export async function getCompaniesByStatus(statuses: ProspectingStatus[]) {
                         firstName: true,
                         lastName: true,
                         phones: true,
-                        emails: true
+                        emails: true,
+                        linkedin: true
                     }
                 },
                 interactions: {
@@ -288,6 +293,7 @@ export async function updateCompany(id: string, data: {
         revalidatePath("/crm/investigation");
         revalidatePath("/crm/prospecting");
         revalidatePath("/crm");
+        revalidatePath("/contacts", "layout");
         return { success: true, data: company };
     } catch (error) {
         console.error("Error updating company:", error);

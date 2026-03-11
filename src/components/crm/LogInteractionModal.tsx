@@ -55,6 +55,7 @@ export function LogInteractionModal({ companyId, opportunityId, contacts, onSucc
             case "LINKEDIN_MESSAGE": return 3;
             case "EMAIL_SENT": return 1;
             case "EMAIL_OPENED": return 5;
+            case "WHATSAPP_SENT": return 6;
             case "CALL_MADE": return 10;
             case "MEETING": return 25;
             default: return 0;
@@ -118,6 +119,7 @@ export function LogInteractionModal({ companyId, opportunityId, contacts, onSucc
                                 <SelectContent>
                                     <SelectItem value="EMAIL_SENT">Correo Enviado (+1)</SelectItem>
                                     <SelectItem value="EMAIL_OPENED">Correo Abierto (+5)</SelectItem>
+                                    <SelectItem value="WHATSAPP_SENT">WhatsApp Enviado (+6)</SelectItem>
                                     <SelectItem value="CALL_MADE">Llamada Realizada (+10)</SelectItem>
                                     <SelectItem value="MEETING">Reunión Comercial (+25)</SelectItem>
                                     <SelectItem value="LINKEDIN_CONNECT">Conectar LinkedIn (+2)</SelectItem>

@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { PhoneCall, Building2, Calendar, TrendingUp, Clock, AlertCircle, Trash2, MessageCircle, X, ChevronDown, ChevronUp, History, Pencil, CheckCircle2, MoreHorizontal, CalendarClock } from "lucide-react";
-import { useState, useMemo, Fragment } from "react";
+import { PhoneCall, Building2, Calendar, TrendingUp, Clock, AlertCircle, Trash2, MessageCircle, X, ChevronDown, ChevronUp, History, Pencil, CheckCircle2, MoreHorizontal, CalendarClock, Linkedin, Plus } from "lucide-react";
+import { useState, useMemo, Fragment, useEffect } from "react";
 import { deleteContactInfo } from "@/app/actions/crm/contact-actions";
 
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,9 @@ export default function ProspectingClient({ initialCompanies }: { initialCompani
     const [activeTab, setActiveTab] = useState("today");
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
+
+    const [postponedIds, setPostponedIds] = useState<Set<string>>(new Set());
+    const [lockedCategories, setLockedCategories] = useState<{ [id: string]: string }>({});
 
     const toggleExpand = (companyId: string) => {
         setExpandedCompanies(prev => {
@@ -71,11 +74,34 @@ export default function ProspectingClient({ initialCompanies }: { initialCompani
         });
     }, [companiesList]);
 
+    useEffect(() => {
+        setLockedCategories(prev => {
+            const next = { ...prev };
+            let changed = false;
+            companiesWithData.forEach(c => {
+                if (!next[c.company.id]) {
+                    let category = '';
+                    if (!c.lastInteraction && !c.nextTask) category = 'new';
+                    else if (c.nextTaskFormattedDate && c.nextTaskFormattedDate <= todayDate) category = 'today';
+                    else if (c.nextTaskFormattedDate && c.nextTaskFormattedDate > todayDate) category = 'future';
+                    else if (c.lastInteraction && !c.nextTask) category = 'inactive';
+
+                    if (category) {
+                        next[c.company.id] = category;
+                        changed = true;
+                    }
+                }
+            });
+            return changed ? next : prev;
+        });
+    }, [companiesWithData, todayDate]);
+
     // Segmentación
-    const nuevos = companiesWithData.filter((c: any) => !c.lastInteraction && !c.nextTask);
-    const paraHoyAtrasadas = companiesWithData.filter((c: any) => c.nextTaskFormattedDate && c.nextTaskFormattedDate <= todayDate);
-    const futuras = companiesWithData.filter((c: any) => c.nextTaskFormattedDate && c.nextTaskFormattedDate > todayDate);
-    const sinSeguimientoActivo = companiesWithData.filter((c: any) => c.lastInteraction && !c.nextTask);
+    const visibleCompanies = companiesWithData.filter(c => !postponedIds.has(c.company.id));
+    const nuevos = visibleCompanies.filter((c: any) => lockedCategories[c.company.id] === 'new');
+    const paraHoyAtrasadas = visibleCompanies.filter((c: any) => lockedCategories[c.company.id] === 'today');
+    const futuras = visibleCompanies.filter((c: any) => lockedCategories[c.company.id] === 'future');
+    const sinSeguimientoActivo = visibleCompanies.filter((c: any) => lockedCategories[c.company.id] === 'inactive');
 
     const renderTable = (data: typeof companiesWithData, emptyMessage: string) => {
         const totalPages = Math.ceil(data.length / itemsPerPage);
@@ -112,6 +138,7 @@ export default function ProspectingClient({ initialCompanies }: { initialCompani
                                     const interactionTypeLabel = (t: string) => {
                                         switch (t) {
                                             case 'CALL_MADE': return '📞 Llamada';
+                                            case 'WHATSAPP_SENT': return '💬 WhatsApp Enviado';
                                             case 'EMAIL_SENT': return '✉️ Correo Enviado';
                                             case 'EMAIL_OPENED': return '📨 Correo Abierto';
                                             case 'MEETING': return '🤝 Reunión';
@@ -147,6 +174,17 @@ export default function ProspectingClient({ initialCompanies }: { initialCompani
                                                                     <div className="flex items-center justify-between font-semibold mb-1 group">
                                                                         <div className="flex items-center gap-1">
                                                                             🗣️ {c.firstName} {c.lastName}
+                                                                            {c.linkedin && (
+                                                                                <a
+                                                                                    href={c.linkedin.startsWith('http') ? c.linkedin : `https://${c.linkedin}`}
+                                                                                    target="_blank"
+                                                                                    rel="noopener noreferrer"
+                                                                                    className="text-blue-600 hover:text-blue-800 ml-1"
+                                                                                    title="Perfil de LinkedIn"
+                                                                                >
+                                                                                    <Linkedin className="h-3 w-3 inline" />
+                                                                                </a>
+                                                                            )}
                                                                             {contactedToday && <CheckCircle2 className="h-3 w-3 text-emerald-500 ml-1" />}
                                                                         </div>
                                                                         <div className="flex items-center gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
@@ -232,6 +270,9 @@ export default function ProspectingClient({ initialCompanies }: { initialCompani
                                                                 +{companyContacts.length - 3} contactos ocultos
                                                             </span>
                                                         )}
+                                                        <Link href={`/contacts/new?companyId=${company.id}`} className="text-blue-600 hover:text-blue-800 flex items-center gap-1 text-[11px] mt-1 font-medium">
+                                                            <Plus className="h-3 w-3" /> Añadir Contacto
+                                                        </Link>
                                                     </div>
                                                 </TableCell>
 
@@ -286,7 +327,7 @@ export default function ProspectingClient({ initialCompanies }: { initialCompani
                                                         contacts={companyContacts}
                                                         defaultContactId="none"
                                                         isSimplePostpone={true}
-                                                        onSuccess={() => { }}
+                                                        onSuccess={() => setPostponedIds(p => new Set(p).add(company.id))}
                                                         triggerButton={
                                                             <Button size="sm" variant="outline" className="h-8 border-dashed border-primary/50 text-primary w-[140px]">
                                                                 <Calendar className="h-3 w-3 mr-1" /> Posponer Cuenta
@@ -301,7 +342,7 @@ export default function ProspectingClient({ initialCompanies }: { initialCompani
                                                     <DisqualifyModal
                                                         companyId={company.id}
                                                         companyName={company.businessName}
-                                                        onSuccess={() => { }}
+                                                        onSuccess={() => setPostponedIds(p => new Set(p).add(company.id))}
                                                         triggerButton={
                                                             <Button variant="ghost" size="sm" className="h-7 text-red-500 hover:text-red-700 hover:bg-red-50">
                                                                 <Trash2 className="h-3 w-3 mr-1" /> Descartar
@@ -325,7 +366,7 @@ export default function ProspectingClient({ initialCompanies }: { initialCompani
                                                                         <div key={interaction.id} className="relative pl-6">
                                                                             <div className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 flex items-center justify-center text-[8px] ${idx === 0 ? 'bg-primary border-primary text-white' : 'bg-background border-muted-foreground/40 text-muted-foreground'
                                                                                 }`}>
-                                                                                {interaction.type === 'CALL_MADE' ? '📞' : interaction.type === 'EMAIL_SENT' ? '✉' : interaction.type === 'MEETING' ? '🤝' : '📨'}
+                                                                                {interaction.type === 'CALL_MADE' ? '📞' : interaction.type === 'WHATSAPP_SENT' ? '💬' : interaction.type === 'EMAIL_SENT' ? '✉' : interaction.type === 'MEETING' ? '🤝' : '📨'}
                                                                             </div>
                                                                             <div className="flex flex-col gap-0.5">
                                                                                 <div className="flex items-center gap-2 flex-wrap">
