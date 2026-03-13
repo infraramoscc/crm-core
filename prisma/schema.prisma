@@ -115,6 +115,7 @@ model Contact {
 
   company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   interactions Interaction[]
+  opportunities Opportunity[]
 }
 
 /// Tipos de puertos / ubicaciones
@@ -236,13 +237,48 @@ enum OpportunityStage {
   LOST
 }
 
+enum OpportunityServiceLine {
+  FORWARDING
+  CUSTOMS
+  INLAND
+  INTEGRAL
+  WAREHOUSE
+  OTHER
+}
+
+enum ShipmentMode {
+  SEA
+  AIR
+  LAND
+  MULTIMODAL
+}
+
+enum OpportunityFrequency {
+  SPOT
+  RECURRENT
+  TENDER
+}
+
 /// Oportunidad de Venta (Pipeline)
 model Opportunity {
   id               String           @id @default(uuid())
   companyId        String
+  contactId        String?
   title            String /// Ej: FCL China-Callao
   stage            OpportunityStage @default(PROSPECTING)
   lossReason       String?          @db.Text
+  serviceLine      OpportunityServiceLine @default(FORWARDING)
+  shipmentMode     ShipmentMode     @default(SEA)
+  operationFrequency OpportunityFrequency @default(SPOT)
+  decisionDriver   ValueDriver      @default(UNKNOWN)
+  originLabel      String?
+  destinationLabel String?
+  incotermCode     String?
+  competitorName   String?
+  nextStep         String?
+  nextStepDate     DateTime?
+  externalQuoteRef String?
+  externalQuoteIssuedAt DateTime?
   expectedValue    Float?
   expectedCurrency String?          @default("USD")
   closeDate        DateTime?
@@ -252,6 +288,7 @@ model Opportunity {
   updatedAt DateTime @updatedAt
 
   company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact      Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
   quotes       Quote[]
   interactions Interaction[]
 }

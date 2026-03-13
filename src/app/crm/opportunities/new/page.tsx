@@ -1,16 +1,22 @@
+import { getOpportunityFormOptions } from "@/app/actions/crm/crm-actions";
 import { OpportunityForm } from "@/components/crm/OpportunityForm";
 
-export default function NewOpportunityPage() {
+export default async function NewOpportunityPage() {
+    const optionsResult = await getOpportunityFormOptions();
+    const options = optionsResult.success && optionsResult.data
+        ? optionsResult.data
+        : { companies: [], contacts: [] };
+
     return (
-        <div className="flex flex-col gap-6 max-w-4xl mx-auto">
+        <div className="mx-auto flex max-w-4xl flex-col gap-6">
             <div>
                 <h1 className="text-3xl font-bold tracking-tight">Nueva Oportunidad</h1>
                 <p className="text-muted-foreground">
-                    Ingresa al embudo un posible negocio, importación o exportación que estés negociando hoy.
+                    Registra una operacion concreta que valga la pena empujar en el pipeline comercial.
                 </p>
             </div>
 
-            <OpportunityForm />
+            <OpportunityForm companies={options.companies} contacts={options.contacts} />
         </div>
     );
 }

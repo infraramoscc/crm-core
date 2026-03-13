@@ -1,11 +1,15 @@
 import type {
     Prisma,
     CompanyType,
+    OpportunityServiceLine,
+    ShipmentMode,
+    OpportunityFrequency,
     FollowUpType,
     ImportVolume,
     InteractionType,
     TradeRole,
     ValueDriver,
+    OpportunityStage,
 } from "@prisma/client";
 
 export interface CompanyListItem {
@@ -37,6 +41,18 @@ export interface ContactListItem {
 export interface CompanyOption {
     id: string;
     businessName: string;
+}
+
+export interface OpportunityCompanyOption {
+    id: string;
+    businessName: string;
+}
+
+export interface OpportunityContactOption {
+    id: string;
+    companyId: string;
+    firstName: string;
+    lastName: string;
 }
 
 export interface InvestigationContactItem {
@@ -151,3 +167,71 @@ export type ContactDetail = Prisma.ContactGetPayload<{
         };
     };
 }>;
+
+export type OpportunityPipelineItem = Prisma.OpportunityGetPayload<{
+    include: {
+        company: {
+            select: {
+                businessName: true;
+                contacts: {
+                    where: {
+                        isActive: true;
+                    };
+                    select: {
+                        id: true;
+                        firstName: true;
+                        lastName: true;
+                    };
+                };
+            };
+        };
+        contact: {
+            select: {
+                id: true;
+                firstName: true;
+                lastName: true;
+            };
+        };
+    };
+}>;
+
+export type OpportunityDetail = Prisma.OpportunityGetPayload<{
+    include: {
+        company: {
+            select: {
+                id: true;
+                businessName: true;
+            };
+        };
+        contact: {
+            select: {
+                id: true;
+                firstName: true;
+                lastName: true;
+                companyId: true;
+            };
+        };
+    };
+}>;
+
+export interface OpportunityUpsertInput {
+    companyId: string;
+    contactId?: string;
+    title: string;
+    stage?: OpportunityStage;
+    serviceLine?: OpportunityServiceLine;
+    shipmentMode?: ShipmentMode;
+    operationFrequency?: OpportunityFrequency;
+    decisionDriver?: ValueDriver;
+    originLabel?: string;
+    destinationLabel?: string;
+    incotermCode?: string;
+    competitorName?: string;
+    nextStep?: string;
+    nextStepDate?: string;
+    externalQuoteRef?: string;
+    externalQuoteIssuedAt?: string;
+    expectedValue?: number;
+    expectedCurrency?: string;
+    closeDate?: string;
+}
