@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { Plus, MoreHorizontal, Pencil, Trash, Tag } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import type { Service } from "@/lib/mock-data";
+import { matchesSearch } from "@/lib/search";
+import { useScopedSearch } from "@/components/layout/SearchProvider";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -21,14 +24,21 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export default function ServicesClient({ initialServices }: { initialServices: any[] }) {
+export default function ServicesClient({ initialServices }: { initialServices: Service[] }) {
     const [currentPage, setCurrentPage] = useState(1);
+    const { query: searchQuery } = useScopedSearch();
     const itemsPerPage = 10;
 
-    const totalPages = Math.ceil(initialServices.length / itemsPerPage);
-    const paginatedServices = initialServices.slice(
-        (currentPage - 1) * itemsPerPage,
-        currentPage * itemsPerPage
+    const filteredServices = useMemo(
+        () => initialServices.filter((service) => matchesSearch(searchQuery, service.code, service.name, service.category, service.currencyCode, service.defaultPrice)),
+        [initialServices, searchQuery]
+    );
+
+    const effectivePage = searchQuery ? 1 : currentPage;
+    const totalPages = Math.ceil(filteredServices.length / itemsPerPage);
+    const paginatedServices = filteredServices.slice(
+        (effectivePage - 1) * itemsPerPage,
+        effectivePage * itemsPerPage
     );
 
     const getCategoryTheme = (category: string) => {
@@ -140,7 +150,7 @@ export default function ServicesClient({ initialServices }: { initialServices: a
                             </TableRow>
                         ))}
 
-                        {initialServices.length === 0 && (
+                        {filteredServices.length === 0 && (
                             <TableRow>
                                 <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
                                     No hay servicios registrados aún.
@@ -155,7 +165,7 @@ export default function ServicesClient({ initialServices }: { initialServices: a
             {totalPages > 1 && (
                 <div className="flex items-center justify-between border-t border-border pt-4">
                     <p className="text-sm text-muted-foreground">
-                        Mostrando {(currentPage - 1) * itemsPerPage + 1} a {Math.min(currentPage * itemsPerPage, initialServices.length)} de {initialServices.length} servicios
+                        Mostrando {(effectivePage - 1) * itemsPerPage + 1} a {Math.min(effectivePage * itemsPerPage, filteredServices.length)} de {filteredServices.length} servicios
                     </p>
                     <div className="flex items-center gap-2">
                         <Button
@@ -167,7 +177,7 @@ export default function ServicesClient({ initialServices }: { initialServices: a
                             Anterior
                         </Button>
                         <span className="text-sm font-medium">
-                            Página {currentPage} de {totalPages}
+                            Página {effectivePage} de {totalPages}
                         </span>
                         <Button
                             variant="outline"

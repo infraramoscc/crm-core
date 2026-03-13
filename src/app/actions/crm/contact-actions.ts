@@ -12,6 +12,10 @@ export async function createContact(data: {
     phones?: string[];
     position?: string;
     linkedin?: string;
+    birthday?: string;
+    anniversary?: string;
+    interests?: string;
+    notes?: string;
     isActive?: boolean;
     inactiveReason?: string;
 }) {
@@ -25,6 +29,10 @@ export async function createContact(data: {
                 phones: data.phones || [],
                 position: data.position || "",
                 linkedin: data.linkedin || "",
+                birthday: data.birthday ? new Date(data.birthday) : null,
+                anniversary: data.anniversary ? new Date(data.anniversary) : null,
+                interests: data.interests || null,
+                notes: data.notes || null,
                 isActive: data.isActive ?? true,
                 inactiveReason: data.inactiveReason || null
             }
@@ -107,10 +115,10 @@ export async function deleteContactInfo(contactId: string, type: 'email' | 'phon
         if (!contact) throw new Error("Contact not found");
 
         if (type === 'email') {
-            const newEmails = contact.emails.filter((e: any) => e !== value);
+            const newEmails = contact.emails.filter((email) => email !== value);
             await prisma.contact.update({ where: { id: contactId }, data: { emails: newEmails } });
         } else {
-            const newPhones = contact.phones.filter((p: any) => p !== value);
+            const newPhones = contact.phones.filter((phone) => phone !== value);
             await prisma.contact.update({ where: { id: contactId }, data: { phones: newPhones } });
         }
 
@@ -175,6 +183,10 @@ export async function updateContact(id: string, data: {
     phones?: string[];
     position?: string;
     linkedin?: string;
+    birthday?: string;
+    anniversary?: string;
+    interests?: string;
+    notes?: string;
     isActive?: boolean;
     inactiveReason?: string;
 }) {
@@ -189,6 +201,10 @@ export async function updateContact(id: string, data: {
                 phones: data.phones,
                 position: data.position,
                 linkedin: data.linkedin,
+                birthday: data.birthday ? new Date(data.birthday) : null,
+                anniversary: data.anniversary ? new Date(data.anniversary) : null,
+                interests: data.interests,
+                notes: data.notes,
                 isActive: data.isActive,
                 inactiveReason: data.inactiveReason
             }

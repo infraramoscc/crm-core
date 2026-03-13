@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { Plus, MoreHorizontal, Pencil, Trash } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import type { CompanyListItem } from "@/lib/crm-list-types";
+import { matchesSearch } from "@/lib/search";
+import { useScopedSearch } from "@/components/layout/SearchProvider";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -21,15 +24,25 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export default function CompaniesClient({ initialCompanies }: { initialCompanies: any[] }) {
+export default function CompaniesClient({ initialCompanies }: { initialCompanies: CompanyListItem[] }) {
     // Paginación
     const [currentPage, setCurrentPage] = useState(1);
+    const { query: searchQuery } = useScopedSearch();
     const itemsPerPage = 10;
 
-    const totalPages = Math.ceil(initialCompanies.length / itemsPerPage);
-    const paginatedCompanies = initialCompanies.slice(
-        (currentPage - 1) * itemsPerPage,
-        currentPage * itemsPerPage
+    const filteredCompanies = useMemo(
+        () =>
+            initialCompanies.filter((company) =>
+                matchesSearch(searchQuery, company.businessName, company.tradeName, company.documentType, company.documentNumber, company.companyType, company.city, company.countryCode)
+            ),
+        [initialCompanies, searchQuery]
+    );
+
+    const effectivePage = searchQuery ? 1 : currentPage;
+    const totalPages = Math.ceil(filteredCompanies.length / itemsPerPage);
+    const paginatedCompanies = filteredCompanies.slice(
+        (effectivePage - 1) * itemsPerPage,
+        effectivePage * itemsPerPage
     );
 
     return (
@@ -62,14 +75,14 @@ export default function CompaniesClient({ initialCompanies }: { initialCompanies
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {initialCompanies.length === 0 ? (
+                        {filteredCompanies.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
                                     No hay empresas registradas aún. Importa desde un Excel o crea una manualmente.
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            paginatedCompanies.map((company: any) => (
+                            paginatedCompanies.map((company) => (
                                 <TableRow key={company.id}>
                                     <TableCell className="font-medium">
                                         {company.businessName}
@@ -131,7 +144,7 @@ export default function CompaniesClient({ initialCompanies }: { initialCompanies
             {totalPages > 1 && (
                 <div className="flex items-center justify-between border-t border-border pt-4">
                     <p className="text-sm text-muted-foreground">
-                        Mostrando {(currentPage - 1) * itemsPerPage + 1} a {Math.min(currentPage * itemsPerPage, initialCompanies.length)} de {initialCompanies.length} empresas
+                        Mostrando {(effectivePage - 1) * itemsPerPage + 1} a {Math.min(effectivePage * itemsPerPage, filteredCompanies.length)} de {filteredCompanies.length} empresas
                     </p>
                     <div className="flex items-center gap-2">
                         <Button
@@ -143,7 +156,7 @@ export default function CompaniesClient({ initialCompanies }: { initialCompanies
                             Anterior
                         </Button>
                         <span className="text-sm font-medium">
-                            Página {currentPage} de {totalPages}
+                            Página {effectivePage} de {totalPages}
                         </span>
                         <Button
                             variant="outline"

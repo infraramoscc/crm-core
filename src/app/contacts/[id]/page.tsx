@@ -1,6 +1,7 @@
 import { ContactForm } from "@/components/contacts/ContactForm";
 import { getContactById } from "@/app/actions/crm/contact-actions";
 import { getAllCompanies } from "@/app/actions/crm/company-actions";
+import type { CompanyOption } from "@/lib/crm-list-types";
 import { notFound } from "next/navigation";
 
 interface EditContactPageProps {
@@ -18,9 +19,9 @@ export default async function EditContactPage({ params }: EditContactPageProps) 
 
     // Obtener lista de empresas para el select
     const companiesResult = await getAllCompanies();
-    const companies = (companiesResult.data || []).map((c: any) => ({
-        id: c.id,
-        businessName: c.businessName,
+    const companies: CompanyOption[] = (companiesResult.data || []).map((company) => ({
+        id: company.id,
+        businessName: company.businessName,
     }));
 
     if (!contact) {

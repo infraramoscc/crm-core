@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createInteraction } from "@/app/actions/crm/interaction-actions";
-import type { InteractionType } from "@prisma/client";
+import type { FollowUpType, InteractionType } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,10 +25,16 @@ import {
 } from "@/components/ui/dialog";
 import { PhoneCall } from "lucide-react";
 
+interface InteractionContactOption {
+    id: string;
+    firstName: string;
+    lastName: string;
+}
+
 interface LogInteractionModalProps {
     companyId: string;
     opportunityId?: string;
-    contacts: any[];
+    contacts: InteractionContactOption[];
     onSuccess?: () => void;
     triggerButton?: React.ReactNode;
     defaultContactId?: string;
@@ -40,12 +46,10 @@ export function LogInteractionModal({ companyId, opportunityId, contacts, onSucc
     const [type, setType] = useState<InteractionType>("EMAIL_SENT"); // Por defecto correo enviado como seguimiento
     const [notes, setNotes] = useState("");
     const [contactId, setContactId] = useState(defaultContactId || contacts[0]?.id || "");
-    const [interactedAt, setInteractedAt] = useState(new Date().toISOString().split('T')[0]);
-
     // Tarea Futura
     const [createTask, setCreateTask] = useState(false);
     const [nextFollowUpDate, setNextFollowUpDate] = useState("");
-    const [followUpType, setFollowUpType] = useState<"CALL" | "EMAIL" | "MEETING" | "LINKEDIN" | "WHATSAPP" | "OTHER">("CALL");
+    const [followUpType, setFollowUpType] = useState<FollowUpType>("CALL");
 
     const [loading, setLoading] = useState(false);
 
@@ -73,7 +77,7 @@ export function LogInteractionModal({ companyId, opportunityId, contacts, onSucc
             type,
             notes,
             scoreImpact: getScoreImpact(type),
-            interactedAt: interactedAt,
+            interactedAt: new Date().toISOString(),
             nextFollowUpDate: createTask && nextFollowUpDate ? new Date(nextFollowUpDate).toISOString() : undefined,
             followUpType: createTask && nextFollowUpDate ? followUpType : undefined,
         });
@@ -172,7 +176,7 @@ export function LogInteractionModal({ companyId, opportunityId, contacts, onSucc
                                 <div className="grid grid-cols-2 gap-4 pl-6 border-l-2 border-amber-200">
                                     <div className="space-y-2">
                                         <Label className="text-amber-900">¿Qué harás?</Label>
-                                        <Select value={followUpType} onValueChange={(val: any) => setFollowUpType(val)}>
+                                        <Select value={followUpType} onValueChange={(value) => setFollowUpType(value as FollowUpType)}>
                                             <SelectTrigger className="bg-white">
                                                 <SelectValue />
                                             </SelectTrigger>

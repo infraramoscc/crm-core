@@ -1,17 +1,6 @@
 import { ClerkProvider } from '@clerk/nextjs'
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -19,6 +8,7 @@ export const metadata: Metadata = {
 };
 
 import { Sidebar } from "@/components/layout/Sidebar";
+import { SearchProvider } from "@/components/layout/SearchProvider";
 import { Topbar } from "@/components/layout/Topbar";
 
 export default function RootLayout({
@@ -32,18 +22,20 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="es" suppressHydrationWarning>
         <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+          className="antialiased"
         >
-          <div className="flex min-h-screen bg-muted/40 text-foreground">
-            <Sidebar />
-            <div className="flex w-full flex-col lg:pl-0">
-              <Topbar />
-              <main className="flex-1 overflow-auto p-4 md:p-6 lg:p-8">
-                {children}
-              </main>
+          <SearchProvider>
+            <div className="flex min-h-screen bg-muted/40 text-foreground">
+              <Sidebar />
+              <div className="flex w-full flex-col lg:pl-0">
+                <Topbar />
+                <main className="flex-1 overflow-auto p-4 md:p-6 lg:p-8">
+                  {children}
+                </main>
+              </div>
+              {modal}
             </div>
-            {modal}
-          </div>
+          </SearchProvider>
         </body>
       </html>
     </ClerkProvider>

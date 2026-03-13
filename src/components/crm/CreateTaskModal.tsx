@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createInteraction } from "@/app/actions/crm/interaction-actions";
+import type { FollowUpType } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,9 +24,15 @@ import {
 } from "@/components/ui/dialog";
 import { CalendarClock } from "lucide-react";
 
+interface TaskContactOption {
+    id: string;
+    firstName: string;
+    lastName: string;
+}
+
 interface CreateTaskModalProps {
     companyId: string;
-    contacts: any[];
+    contacts: TaskContactOption[];
     onSuccess?: () => void;
     triggerButton?: React.ReactNode;
     defaultContactId?: string;
@@ -35,7 +42,7 @@ interface CreateTaskModalProps {
 export function CreateTaskModal({ companyId, contacts, onSuccess, triggerButton, defaultContactId, isSimplePostpone }: CreateTaskModalProps) {
     const [open, setOpen] = useState(false);
     const [nextFollowUpDate, setNextFollowUpDate] = useState("");
-    const [followUpType, setFollowUpType] = useState<"CALL" | "EMAIL" | "MEETING" | "LINKEDIN" | "WHATSAPP" | "OTHER">(isSimplePostpone ? "OTHER" : "CALL");
+    const [followUpType, setFollowUpType] = useState<FollowUpType>(isSimplePostpone ? "OTHER" : "CALL");
     const [contactId, setContactId] = useState(defaultContactId || "none");
     const [loading, setLoading] = useState(false);
 
@@ -87,7 +94,7 @@ export function CreateTaskModal({ companyId, contacts, onSuccess, triggerButton,
                         <>
                             <div className="space-y-2">
                                 <Label>Tipo de Tarea</Label>
-                                <Select value={followUpType} onValueChange={(val: any) => setFollowUpType(val)}>
+                                <Select value={followUpType} onValueChange={(value) => setFollowUpType(value as FollowUpType)}>
                                     <SelectTrigger>
                                         <SelectValue />
                                     </SelectTrigger>

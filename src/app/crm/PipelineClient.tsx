@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { Plus, MoreHorizontal, Calendar, DollarSign, Building, MessageSquarePlus, AlertTriangle } from "lucide-react";
 import { mockCompanies, mockContacts, type OpportunityStage } from "@/lib/mock-data";
+import { matchesSearch } from "@/lib/search";
 import { LogInteractionModal } from "@/components/crm/LogInteractionModal";
 import { LossReasonModal } from "@/components/crm/LossReasonModal";
 import { useState } from "react";
 import { moveOpportunityStage } from "@/app/actions/crm/crm-actions";
 import { useRouter } from "next/navigation";
+import { useScopedSearch } from "@/components/layout/SearchProvider";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -30,6 +32,7 @@ const STAGES: { value: OpportunityStage; label: string; color: string }[] = [
 
 export default function PipelineClient({ initialOpportunities }: { initialOpportunities: any[] }) {
     const router = useRouter();
+    const { query: searchQuery } = useScopedSearch();
 
     // D&D State
     const [draggedOppId, setDraggedOppId] = useState<string | null>(null);
@@ -96,7 +99,9 @@ export default function PipelineClient({ initialOpportunities }: { initialOpport
         router.refresh();
     };
 
-    const oppsToRender = optimisticOpps.length > 0 ? optimisticOpps : initialOpportunities;
+    const oppsToRender = (optimisticOpps.length > 0 ? optimisticOpps : initialOpportunities).filter((opp) =>
+        matchesSearch(searchQuery, opp.title, opp.company?.businessName, getCompanyById(opp.companyId)?.businessName, opp.expectedCurrency, opp.stage, opp.lossReason)
+    );
 
     return (
         <div className="flex flex-col gap-6 h-full min-h-[calc(100vh-8rem)]">

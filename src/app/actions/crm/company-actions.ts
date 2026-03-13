@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import type { CompanyType, ProspectingStatus, ValueDriver, ImportVolume, TradeRole } from "@prisma/client";
+import type { CompanyDetail, CompanyUpdateInput } from "@/lib/crm-list-types";
 
 export async function createCompany(data: {
     documentNumber: string;
@@ -216,7 +217,12 @@ export async function updateCompanyStatus(
     score?: number
 ) {
     try {
-        const updateData: any = {
+        const updateData: {
+            prospectingStatus: ProspectingStatus;
+            disqualificationReason?: string;
+            valueDriver?: ValueDriver;
+            leadScore?: number;
+        } = {
             prospectingStatus: status
         };
 
@@ -264,10 +270,18 @@ export async function getAllCompanies() {
 
 export async function getCompanyById(id: string) {
     try {
-        const company = await prisma.company.findUnique({
+        const company: CompanyDetail | null = await prisma.company.findUnique({
             where: { id },
             include: {
                 contacts: true,
+                interactions: {
+                    include: {
+                        contact: {
+                            select: { firstName: true, lastName: true }
+                        }
+                    },
+                    orderBy: { interactedAt: "desc" }
+                }
             }
         });
         if (!company) {
@@ -280,25 +294,7 @@ export async function getCompanyById(id: string) {
     }
 }
 
-export async function updateCompany(id: string, data: {
-    documentNumber?: string;
-    documentType?: string;
-    businessName?: string;
-    tradeName?: string;
-    website?: string;
-    companyType?: CompanyType;
-    tradeRole?: any;
-    isActive?: boolean;
-    annualDams?: number;
-    importVolume?: any;
-    valueDriver?: any;
-    strategyTags?: string;
-    prospectingStatus?: ProspectingStatus;
-    legalRepresentative?: string;
-    address?: string;
-    city?: string;
-    countryCode?: string;
-}) {
+export async function updateCompany(id: string, data: CompanyUpdateInput) {
     try {
         const company = await prisma.company.update({
             where: { id },

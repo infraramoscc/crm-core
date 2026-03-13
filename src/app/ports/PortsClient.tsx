@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { Plus, MoreHorizontal, Pencil, Trash, Earth } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import type { Port } from "@/lib/mock-data";
+import { matchesSearch } from "@/lib/search";
+import { useScopedSearch } from "@/components/layout/SearchProvider";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -21,14 +24,21 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export default function PortsClient({ initialPorts }: { initialPorts: any[] }) {
+export default function PortsClient({ initialPorts }: { initialPorts: Port[] }) {
     const [currentPage, setCurrentPage] = useState(1);
+    const { query: searchQuery } = useScopedSearch();
     const itemsPerPage = 10;
 
-    const totalPages = Math.ceil(initialPorts.length / itemsPerPage);
-    const paginatedPorts = initialPorts.slice(
-        (currentPage - 1) * itemsPerPage,
-        currentPage * itemsPerPage
+    const filteredPorts = useMemo(
+        () => initialPorts.filter((port) => matchesSearch(searchQuery, port.code, port.name, port.countryCode, port.type)),
+        [initialPorts, searchQuery]
+    );
+
+    const effectivePage = searchQuery ? 1 : currentPage;
+    const totalPages = Math.ceil(filteredPorts.length / itemsPerPage);
+    const paginatedPorts = filteredPorts.slice(
+        (effectivePage - 1) * itemsPerPage,
+        effectivePage * itemsPerPage
     );
 
     const getPortTypeConfig = (type: string) => {
@@ -122,7 +132,7 @@ export default function PortsClient({ initialPorts }: { initialPorts: any[] }) {
                             );
                         })}
 
-                        {initialPorts.length === 0 && (
+                        {filteredPorts.length === 0 && (
                             <TableRow>
                                 <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
                                     No hay puertos registrados aún.
@@ -137,7 +147,7 @@ export default function PortsClient({ initialPorts }: { initialPorts: any[] }) {
             {totalPages > 1 && (
                 <div className="flex items-center justify-between border-t border-border pt-4">
                     <p className="text-sm text-muted-foreground">
-                        Mostrando {(currentPage - 1) * itemsPerPage + 1} a {Math.min(currentPage * itemsPerPage, initialPorts.length)} de {initialPorts.length} puertos
+                        Mostrando {(effectivePage - 1) * itemsPerPage + 1} a {Math.min(effectivePage * itemsPerPage, filteredPorts.length)} de {filteredPorts.length} puertos
                     </p>
                     <div className="flex items-center gap-2">
                         <Button
@@ -149,7 +159,7 @@ export default function PortsClient({ initialPorts }: { initialPorts: any[] }) {
                             Anterior
                         </Button>
                         <span className="text-sm font-medium">
-                            Página {currentPage} de {totalPages}
+                            Página {effectivePage} de {totalPages}
                         </span>
                         <Button
                             variant="outline"

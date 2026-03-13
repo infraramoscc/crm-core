@@ -1,41 +1,59 @@
 "use client";
 
-import { useState } from "react";
-import { CalendarClock, CheckCircle, CheckCircle2, Clock, MapPin, Building2, Phone, Mail, AlertCircle } from "lucide-react";
+import { useMemo, useState } from "react";
+import { CalendarClock, CheckCircle, CheckCircle2, Clock, Building2, Phone, Mail, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import Link from "next/link";
+import type { FollowUpType, InteractionType } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { createInteraction } from "@/app/actions/crm/interaction-actions";
+import { completeTask } from "@/app/actions/crm/task-actions";
+import { matchesSearch } from "@/lib/search";
+import { useScopedSearch } from "@/components/layout/SearchProvider";
 
-export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
+interface TaskItem {
+    id: string;
+    companyId: string;
+    type: InteractionType;
+    notes: string | null;
+    nextFollowUpDate: string | Date | null;
+    followUpType: FollowUpType | null;
+    company: {
+        id: string;
+        businessName: string;
+    } | null;
+    contact: {
+        id: string;
+        firstName: string;
+        lastName: string;
+    } | null;
+}
+
+export default function TasksClient({ initialTasks }: { initialTasks: TaskItem[] }) {
     const [tasks, setTasks] = useState(initialTasks);
     const [completingId, setCompletingId] = useState<string | null>(null);
+    const { query: searchQuery } = useScopedSearch();
 
-    const handleCompleteTask = async (taskId: string, companyId: string) => {
+    const handleCompleteTask = async (taskId: string) => {
         setCompletingId(taskId);
-
-        // Creamos una nueva interaccion que simboliza que la tarea previa se marco como completada
-        // pero la logica del action matara las tareas pendientes anteriores.
-        const result = await createInteraction({
-            companyId,
-            type: "SYSTEM_NOTE",
-            notes: "Tarea completada desde la Agenda",
-            interactedAt: new Date().toISOString(),
-            // Al NO enviar nextFollowUpDate ni followUpType, la logica mata las previas?
-            // El action `createInteraction` marca `isFollowUpCompleted: true` de las anteriores 
-            // solo si mandamos `nextFollowUpDate`.
-        });
-
-        // Alternativa: Actualizar directamente la tarea a isFollowUpCompleted = true
-        // Para simplificar sin hacer otro server action por ahora, quitamos la tarea del UI optimisticamente
-        setTasks(prev => prev.filter(t => t.id !== taskId));
+        const result = await completeTask(taskId);
+        if (result.success) {
+            setTasks((prev) => prev.filter((task) => task.id !== taskId));
+        }
         setCompletingId(null);
     };
 
-    const dueToday = tasks.filter(t => {
+    const filteredTasks = useMemo(
+        () =>
+            tasks.filter((task) =>
+                matchesSearch(searchQuery, task.company?.businessName, task.contact?.firstName, task.contact?.lastName, task.notes, task.followUpType)
+            ),
+        [tasks, searchQuery]
+    );
+
+    const dueToday = filteredTasks.filter(t => {
         if (!t.nextFollowUpDate) return false;
         const taskDate = new Date(t.nextFollowUpDate);
         taskDate.setHours(0, 0, 0, 0);
@@ -44,12 +62,12 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
         return taskDate.getTime() === today.getTime();
     });
 
-    const overdue = tasks.filter(t => {
+    const overdue = filteredTasks.filter(t => {
         if (!t.nextFollowUpDate) return false;
         return new Date(t.nextFollowUpDate) < new Date() && !dueToday.includes(t);
     });
 
-    const upcoming = tasks.filter(t => {
+    const upcoming = filteredTasks.filter(t => {
         if (!t.nextFollowUpDate) return false;
         return new Date(t.nextFollowUpDate) > new Date() && !dueToday.includes(t);
     });
@@ -59,7 +77,7 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
         return d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
     };
 
-    const renderTaskCard = (t: any, isOverdue: boolean) => (
+    const renderTaskCard = (t: TaskItem, isOverdue: boolean) => (
         <Card key={t.id} className={`group hover:shadow-md transition-shadow ${isOverdue ? 'border-red-200 bg-red-50/10' : ''}`}>
             <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-start gap-4 flex-1">
@@ -78,7 +96,7 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
                                 {t.followUpType}
                             </Badge>
                         </div>
-                        <Link href={`/crm/companies/${t.companyId}`} className="text-lg font-bold hover:underline hover:text-primary flex items-center gap-2">
+                        <Link href={`/companies/${t.companyId}`} className="text-lg font-bold hover:underline hover:text-primary flex items-center gap-2">
                             <Building2 className="h-4 w-4 text-muted-foreground" />
                             {t.company?.businessName}
                         </Link>
@@ -89,7 +107,7 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
                         )}
                         {t.notes && t.type === 'SYSTEM_NOTE' === false && (
                             <p className="text-xs text-muted-foreground mt-2 border-l-2 border-muted pl-2 italic">
-                                "{t.notes}"
+                                &quot;{t.notes}&quot;
                             </p>
                         )}
                     </div>
@@ -101,7 +119,7 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
                     <Button
                         variant="outline"
                         className="bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100 hover:text-emerald-700"
-                        onClick={() => handleCompleteTask(t.id, t.companyId)}
+                        onClick={() => handleCompleteTask(t.id)}
                         disabled={completingId === t.id}
                     >
                         <CheckCircle className="h-4 w-4 mr-2" />
@@ -130,7 +148,7 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
                 </div>
             </div>
 
-            {tasks.length === 0 ? (
+            {filteredTasks.length === 0 ? (
                 <div className="text-center py-20 flex flex-col items-center justify-center border-2 border-dashed rounded-xl bg-muted/10">
                     <CheckCircle2 className="h-16 w-16 text-emerald-400 mb-4" />
                     <h3 className="text-xl font-bold">¡Estás al día!</h3>

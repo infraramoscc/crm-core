@@ -3,8 +3,10 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, Mail, Phone, User, History, MessageSquareText, PhoneCall, Calendar } from "lucide-react";
+import { Plus, Mail, Phone, User, MessageSquareText, PhoneCall, Calendar } from "lucide-react";
 import { createCompany, updateCompany } from "@/app/actions/crm/company-actions";
+import type { CompanyDetail, CompanyUpdateInput } from "@/lib/crm-list-types";
+import type { CompanyType, ImportVolume, TradeRole, ValueDriver } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,7 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface CompanyFormProps {
-    initialData?: any;
+    initialData?: CompanyDetail;
 }
 
 export function CompanyForm({ initialData }: CompanyFormProps) {
@@ -34,21 +36,21 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
 
         const formData = new FormData(e.currentTarget);
 
-        const companyData = {
+        const companyData: CompanyUpdateInput = {
             businessName: formData.get('businessName') as string,
             tradeName: (formData.get('tradeName') as string) || undefined,
             documentType: documentType,
             documentNumber: formData.get('documentNumber') as string,
-            companyType: companyType as any,
-            tradeRole: formData.get('tradeRole') as any,
+            companyType: companyType as CompanyType,
+            tradeRole: formData.get('tradeRole') as TradeRole,
             annualDams: formData.get('annualDams') ? parseInt(formData.get('annualDams') as string, 10) : undefined,
             legalRepresentative: (formData.get('legalRepresentative') as string) || undefined,
             address: (formData.get('address') as string) || undefined,
             city: (formData.get('city') as string) || undefined,
             countryCode: (formData.get('countryCode') as string) || undefined,
             // CRM Data
-            importVolume: (formData.get('importVolume') as any) || undefined,
-            valueDriver: (formData.get('valueDriver') as any) || undefined,
+            importVolume: ((formData.get('importVolume') as string) || undefined) as ImportVolume | undefined,
+            valueDriver: ((formData.get('valueDriver') as string) || undefined) as ValueDriver | undefined,
             strategyTags: (formData.get('strategyTags') as string) || undefined,
         };
 
@@ -341,7 +343,7 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {initialData.contacts.map((contact: any) => (
+                                    {initialData.contacts.map((contact) => (
                                         <div key={contact.id} className="border rounded-lg p-4 space-y-3 bg-card hover:border-blue-300 transition-colors">
                                             <div className="font-semibold text-lg flex items-center justify-between">
                                                 <span>{contact.firstName} {contact.lastName}</span>
@@ -395,7 +397,7 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
                             ) : (
                                 <div className="space-y-6">
                                     <div className="relative border-l-2 border-primary/20 ml-3 space-y-6">
-                                        {initialData.interactions.map((interaction: any, idx: number) => {
+                                        {initialData.interactions.map((interaction, idx: number) => {
                                             const renderIcon = (type: string, className: string) => {
                                                 switch (type) {
                                                     case 'CALL_MADE': return <PhoneCall className={className} />;

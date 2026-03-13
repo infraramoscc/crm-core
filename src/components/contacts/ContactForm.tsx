@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { createContact, updateContact } from "@/app/actions/crm/contact-actions";
 import { useState } from "react";
+import type { CompanyOption, ContactDetail } from "@/lib/crm-list-types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,8 +20,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface ContactFormProps {
-    initialData?: any;
-    companies?: { id: string; businessName: string }[];
+    initialData?: ContactDetail;
+    companies?: CompanyOption[];
 }
 
 export function ContactForm({ initialData, companies = [] }: ContactFormProps) {
@@ -52,6 +53,10 @@ export function ContactForm({ initialData, companies = [] }: ContactFormProps) {
                 lastName: formData.get("lastName") as string,
                 position: formData.get("position") as string,
                 linkedin: formData.get("linkedin") as string,
+                birthday: (formData.get("birthday") as string) || undefined,
+                anniversary: (formData.get("anniversary") as string) || undefined,
+                interests: (formData.get("interests") as string) || undefined,
+                notes: (formData.get("notes") as string) || undefined,
                 emails: parsedEmails,
                 phones: parsedPhones,
                 isActive,
@@ -72,6 +77,10 @@ export function ContactForm({ initialData, companies = [] }: ContactFormProps) {
                     lastName: formData.get("lastName") as string,
                     position: formData.get("position") as string,
                     linkedin: formData.get("linkedin") as string,
+                    birthday: (formData.get("birthday") as string) || undefined,
+                    anniversary: (formData.get("anniversary") as string) || undefined,
+                    interests: (formData.get("interests") as string) || undefined,
+                    notes: (formData.get("notes") as string) || undefined,
                     emails: parsedEmails,
                     phones: parsedPhones,
                     isActive,
@@ -221,8 +230,9 @@ export function ContactForm({ initialData, companies = [] }: ContactFormProps) {
                                     <Label htmlFor="birthday">Fecha de Cumpleaños</Label>
                                     <Input
                                         id="birthday"
+                                        name="birthday"
                                         type="date"
-                                        defaultValue={initialData?.birthday}
+                                        defaultValue={initialData?.birthday ? new Date(initialData.birthday).toISOString().split("T")[0] : ""}
                                     />
                                 </div>
 
@@ -230,8 +240,9 @@ export function ContactForm({ initialData, companies = [] }: ContactFormProps) {
                                     <Label htmlFor="anniversary">Aniversario (Ej. Empresa o Trabajo)</Label>
                                     <Input
                                         id="anniversary"
+                                        name="anniversary"
                                         type="date"
-                                        defaultValue={initialData?.anniversary}
+                                        defaultValue={initialData?.anniversary ? new Date(initialData.anniversary).toISOString().split("T")[0] : ""}
                                     />
                                 </div>
 
@@ -239,6 +250,7 @@ export function ContactForm({ initialData, companies = [] }: ContactFormProps) {
                                     <Label htmlFor="interests">Intereses y Gustos Personales</Label>
                                     <Textarea
                                         id="interests"
+                                        name="interests"
                                         defaultValue={initialData?.interests}
                                         placeholder="Deportes, Hobbies, Vinos preferidos..."
                                         className="min-h-[80px]"
@@ -249,6 +261,7 @@ export function ContactForm({ initialData, companies = [] }: ContactFormProps) {
                                     <Label htmlFor="notes">Notas Internas para CRM</Label>
                                     <Textarea
                                         id="notes"
+                                        name="notes"
                                         defaultValue={initialData?.notes}
                                         placeholder="Preferencias de negociación, horarios de contacto, objeciones previas..."
                                         className="min-h-[120px]"

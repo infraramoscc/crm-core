@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { Plus, MoreHorizontal, Pencil, Trash, Building2 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import type { ContactListItem } from "@/lib/crm-list-types";
+import { matchesSearch } from "@/lib/search";
+import { useScopedSearch } from "@/components/layout/SearchProvider";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -21,14 +24,24 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export default function ContactsClient({ initialContacts }: { initialContacts: any[] }) {
+export default function ContactsClient({ initialContacts }: { initialContacts: ContactListItem[] }) {
     const [currentPage, setCurrentPage] = useState(1);
+    const { query: searchQuery } = useScopedSearch();
     const itemsPerPage = 10;
 
-    const totalPages = Math.ceil(initialContacts.length / itemsPerPage);
-    const paginatedContacts = initialContacts.slice(
-        (currentPage - 1) * itemsPerPage,
-        currentPage * itemsPerPage
+    const filteredContacts = useMemo(
+        () =>
+            initialContacts.filter((contact) =>
+                matchesSearch(searchQuery, contact.firstName, contact.lastName, contact.position, contact.emails, contact.phones, contact.company?.businessName)
+            ),
+        [initialContacts, searchQuery]
+    );
+
+    const effectivePage = searchQuery ? 1 : currentPage;
+    const totalPages = Math.ceil(filteredContacts.length / itemsPerPage);
+    const paginatedContacts = filteredContacts.slice(
+        (effectivePage - 1) * itemsPerPage,
+        effectivePage * itemsPerPage
     );
 
     return (
@@ -62,14 +75,14 @@ export default function ContactsClient({ initialContacts }: { initialContacts: a
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {initialContacts.length === 0 ? (
+                        {filteredContacts.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                                     No hay contactos registrados aún. Crea uno desde la página de una empresa.
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            paginatedContacts.map((contact: any) => (
+                            paginatedContacts.map((contact) => (
                                 <TableRow key={contact.id}>
                                     <TableCell className="font-medium">
                                         {contact.firstName} {contact.lastName}
@@ -129,7 +142,7 @@ export default function ContactsClient({ initialContacts }: { initialContacts: a
             {totalPages > 1 && (
                 <div className="flex items-center justify-between border-t border-border pt-4">
                     <p className="text-sm text-muted-foreground">
-                        Mostrando {(currentPage - 1) * itemsPerPage + 1} a {Math.min(currentPage * itemsPerPage, initialContacts.length)} de {initialContacts.length} contactos
+                        Mostrando {(effectivePage - 1) * itemsPerPage + 1} a {Math.min(effectivePage * itemsPerPage, filteredContacts.length)} de {filteredContacts.length} contactos
                     </p>
                     <div className="flex items-center gap-2">
                         <Button
@@ -141,7 +154,7 @@ export default function ContactsClient({ initialContacts }: { initialContacts: a
                             Anterior
                         </Button>
                         <span className="text-sm font-medium">
-                            Página {currentPage} de {totalPages}
+                            Página {effectivePage} de {totalPages}
                         </span>
                         <Button
                             variant="outline"

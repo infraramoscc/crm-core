@@ -1,12 +1,13 @@
 import { ContactForm } from "@/components/contacts/ContactForm";
 import { getAllCompanies } from "@/app/actions/crm/company-actions";
 import { Suspense } from "react";
+import type { CompanyOption } from "@/lib/crm-list-types";
 
 export default async function NewContactPage() {
     const result = await getAllCompanies();
-    const companies = (result.data || []).map((c: any) => ({
-        id: c.id,
-        businessName: c.businessName,
+    const companies: CompanyOption[] = (result.data || []).map((company) => ({
+        id: company.id,
+        businessName: company.businessName,
     }));
 
     return (

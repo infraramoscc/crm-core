@@ -2,8 +2,11 @@
 
 import Link from "next/link";
 import { Search, Building2, Plus, MoreHorizontal, UserX, Info } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import type { InvestigationCompanyItem } from "@/lib/crm-list-types";
+import { matchesSearch } from "@/lib/search";
 import { DisqualifyModal } from "@/components/crm/DisqualifyModal";
+import { useScopedSearch } from "@/components/layout/SearchProvider";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -16,16 +19,25 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 
-export default function InvestigationClient({ initialCompanies }: { initialCompanies: any[] }) {
+export default function InvestigationClient({ initialCompanies }: { initialCompanies: InvestigationCompanyItem[] }) {
     // Paginación
     const [currentPage, setCurrentPage] = useState(1);
+    const { query: searchQuery } = useScopedSearch();
     const itemsPerPage = 10;
 
-    // Data paginada
-    const totalPages = Math.ceil(initialCompanies.length / itemsPerPage);
-    const paginatedCompanies = initialCompanies.slice(
-        (currentPage - 1) * itemsPerPage,
-        currentPage * itemsPerPage
+    const filteredCompanies = useMemo(
+        () =>
+            initialCompanies.filter((company) =>
+                matchesSearch(searchQuery, company.businessName, company.documentType, company.documentNumber, company.annualDams, company.contacts.map((contact) => `${contact.firstName} ${contact.lastName} ${contact.inactiveReason || ""}`))
+            ),
+        [initialCompanies, searchQuery]
+    );
+
+    const effectivePage = searchQuery ? 1 : currentPage;
+    const totalPages = Math.ceil(filteredCompanies.length / itemsPerPage);
+    const paginatedCompanies = filteredCompanies.slice(
+        (effectivePage - 1) * itemsPerPage,
+        effectivePage * itemsPerPage
     );
 
     return (
@@ -54,7 +66,7 @@ export default function InvestigationClient({ initialCompanies }: { initialCompa
                     </TableHeader>
                     <TableBody>
                         {paginatedCompanies.map((company) => {
-                            const inactiveContacts = company.contacts?.filter((c: any) => c.isActive === false) || [];
+                            const inactiveContacts = company.contacts.filter((contact) => contact.isActive === false);
                             const hasOnlyInactiveContacts = inactiveContacts.length > 0;
 
                             return (
@@ -72,7 +84,7 @@ export default function InvestigationClient({ initialCompanies }: { initialCompa
                                                         <span className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1 uppercase tracking-wider">
                                                             <Info className="h-3 w-3" /> Motivos de Descarte Previos
                                                         </span>
-                                                        {inactiveContacts.map((ic: any, index: number) => (
+                                                        {inactiveContacts.map((ic, index: number) => (
                                                             <p key={index} className="text-xs text-muted-foreground flex items-start gap-1">
                                                                 <UserX className="h-3 w-3 mt-[2px] shrink-0 text-red-400" />
                                                                 <span className="line-clamp-2">
@@ -126,7 +138,7 @@ export default function InvestigationClient({ initialCompanies }: { initialCompa
                             )
                         })}
 
-                        {initialCompanies.length === 0 && (
+                        {filteredCompanies.length === 0 && (
                             <TableRow>
                                 <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
                                     No hay empresas pendientes de investigación. ¡Buen trabajo!
@@ -141,7 +153,7 @@ export default function InvestigationClient({ initialCompanies }: { initialCompa
             {totalPages > 1 && (
                 <div className="flex items-center justify-between border-t border-border pt-4">
                     <p className="text-sm text-muted-foreground">
-                        Mostrando {(currentPage - 1) * itemsPerPage + 1} a {Math.min(currentPage * itemsPerPage, initialCompanies.length)} de {initialCompanies.length} empresas
+                        Mostrando {(effectivePage - 1) * itemsPerPage + 1} a {Math.min(effectivePage * itemsPerPage, filteredCompanies.length)} de {filteredCompanies.length} empresas
                     </p>
                     <div className="flex items-center gap-2">
                         <Button
@@ -153,7 +165,7 @@ export default function InvestigationClient({ initialCompanies }: { initialCompa
                             Anterior
                         </Button>
                         <span className="text-sm font-medium">
-                            Página {currentPage} de {totalPages}
+                            Página {effectivePage} de {totalPages}
                         </span>
                         <Button
                             variant="outline"

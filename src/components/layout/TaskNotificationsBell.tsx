@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Bell, CalendarClock, CheckCircle2 } from "lucide-react";
+import type { FollowUpType } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
@@ -15,8 +16,20 @@ import { getPendingTasks } from "@/app/actions/crm/task-actions";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 
+interface NotificationTask {
+    id: string;
+    nextFollowUpDate: string | Date | null;
+    followUpType: FollowUpType | null;
+    company: {
+        businessName: string;
+    } | null;
+    contact: {
+        firstName: string;
+    } | null;
+}
+
 export function TaskNotificationsBell() {
-    const [tasks, setTasks] = useState<any[]>([]);
+    const [tasks, setTasks] = useState<NotificationTask[]>([]);
     const [open, setOpen] = useState(false);
 
     const fetchTasks = async () => {
