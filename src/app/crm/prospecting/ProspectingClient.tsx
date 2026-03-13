@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Fragment, useMemo, useState } from "react";
-import { AlertCircle, Building2, Calendar, CalendarClock, CheckCircle2, ChevronDown, ChevronUp, Clock, History, Linkedin, MessageCircle, Pencil, PhoneCall, Plus, Trash2, TrendingUp, X } from "lucide-react";
+import { AlertCircle, Building2, Calendar, CalendarClock, CheckCircle2, ChevronDown, ChevronUp, ClipboardList, Clock, History, Linkedin, MessageCircle, Pencil, PhoneCall, Plus, Target, Trash2, TrendingUp, UserRoundSearch, X } from "lucide-react";
 import type { ProspectingCompanyItem, ProspectingCompanyView } from "@/lib/crm-list-types";
 import { matchesSearch } from "@/lib/search";
 import { deleteContactInfo } from "@/app/actions/crm/contact-actions";
@@ -16,6 +16,51 @@ import { CreateTaskModal } from "@/components/crm/CreateTaskModal";
 import { DisqualifyModal } from "@/components/crm/DisqualifyModal";
 
 const ITEMS_PER_PAGE = 10;
+
+const CONTACT_STATUS_STYLES = {
+    UNVALIDATED: "bg-slate-100 text-slate-700 border-slate-200",
+    VALIDATED_NO_RESPONSE: "bg-amber-100 text-amber-800 border-amber-200",
+    VALIDATED_RESPONDS: "bg-blue-100 text-blue-800 border-blue-200",
+    INTERESTED: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    NOT_DECISION_MAKER: "bg-orange-100 text-orange-800 border-orange-200",
+    DECISION_MAKER: "bg-violet-100 text-violet-800 border-violet-200",
+    REPLACE: "bg-rose-100 text-rose-700 border-rose-200",
+    DISCARDED: "bg-zinc-100 text-zinc-600 border-zinc-200",
+} as const;
+
+const CONTACT_STATUS_LABELS = {
+    UNVALIDATED: "Sin validar",
+    VALIDATED_NO_RESPONSE: "Validado sin respuesta",
+    VALIDATED_RESPONDS: "Responde",
+    INTERESTED: "Interesado",
+    NOT_DECISION_MAKER: "No decide",
+    DECISION_MAKER: "Decisor",
+    REPLACE: "Reemplazar",
+    DISCARDED: "Descartado",
+} as const;
+
+const BUYING_ROLE_LABELS = {
+    UNKNOWN: "Rol sin definir",
+    OPERATIONS: "Operaciones",
+    USER: "Usuario",
+    INFLUENCER: "Influenciador",
+    DECISION_MAKER: "Decisor",
+    BLOCKER: "Bloqueador",
+} as const;
+
+const OUTCOME_LABELS = {
+    NO_RESPONSE: "No respondio",
+    INVALID_PHONE: "Numero invalido",
+    BOUNCED_EMAIL: "Correo rebotado",
+    VERIFIED_CONTACT: "Contacto validado",
+    REFERRED_TO_OTHER: "Derivo a otra persona",
+    CALLBACK_REQUESTED: "Pidio retomar",
+    SHARED_OPERATION: "Compartio operacion",
+    REQUESTED_QUOTE: "Pidio cotizacion",
+    NO_INTEREST: "Sin interes",
+    HAS_CURRENT_VENDOR: "Ya trabaja con otro operador",
+    OTHER: "Otro",
+} as const;
 
 function interactionLabel(type: string) {
     switch (type) {
@@ -36,6 +81,121 @@ function interactionMarker(type: string) {
         case "MEETING": return "R";
         default: return "N";
     }
+}
+
+function getCompanyReadiness(company: ProspectingCompanyItem, interactions: ProspectingCompanyView["allInteractions"]) {
+    const validatedContacts = company.contacts.filter((contact) =>
+        ["VALIDATED_RESPONDS", "INTERESTED", "DECISION_MAKER"].includes(contact.commercialStatus)
+    );
+    const hasDecisionMaker = company.contacts.some((contact) =>
+        contact.commercialStatus === "DECISION_MAKER" || contact.buyingRole === "DECISION_MAKER"
+    );
+    const hasOperationSignal = interactions.some((interaction) =>
+        interaction.outcome === "SHARED_OPERATION" || interaction.outcome === "REQUESTED_QUOTE"
+    );
+
+    if (validatedContacts.length === 0) {
+        return {
+            label: "Validar contacto",
+            description: "Aun falta confirmar un contacto util.",
+            ready: false,
+            tone: "bg-slate-100 text-slate-700 border-slate-200",
+        };
+    }
+
+    if (!hasDecisionMaker) {
+        return {
+            label: "Falta decisor",
+            description: "La cuenta responde, pero aun no aparece quien decide.",
+            ready: false,
+            tone: "bg-amber-100 text-amber-800 border-amber-200",
+        };
+    }
+
+    if (!hasOperationSignal) {
+        return {
+            label: "Descubrir operacion",
+            description: "Ya hay decisor, pero aun falta bajar la necesidad concreta.",
+            ready: false,
+            tone: "bg-blue-100 text-blue-800 border-blue-200",
+        };
+    }
+
+    return {
+        label: "Lista para oportunidad",
+        description: "Ya hay contacto util y senal clara de negocio.",
+        ready: true,
+        tone: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    };
+}
+
+function getBestOpportunityContact(company: ProspectingCompanyItem) {
+    return company.contacts.find((contact) =>
+        contact.commercialStatus === "DECISION_MAKER" || contact.buyingRole === "DECISION_MAKER"
+    ) || company.contacts.find((contact) =>
+        contact.commercialStatus === "INTERESTED" || contact.commercialStatus === "VALIDATED_RESPONDS"
+    ) || company.contacts[0] || null;
+}
+
+function getCoverageSummary(company: ProspectingCompanyItem) {
+    const validated = company.contacts.filter((contact) =>
+        ["VALIDATED_RESPONDS", "INTERESTED", "DECISION_MAKER"].includes(contact.commercialStatus)
+    ).length;
+    const decisionMakers = company.contacts.filter((contact) =>
+        contact.buyingRole === "DECISION_MAKER" || contact.commercialStatus === "DECISION_MAKER"
+    ).length;
+    const influencers = company.contacts.filter((contact) => contact.buyingRole === "INFLUENCER").length;
+    const operations = company.contacts.filter((contact) => contact.buyingRole === "OPERATIONS").length;
+
+    return {
+        validated,
+        decisionMakers,
+        influencers,
+        operations,
+    };
+}
+
+function getDiscoveryPlaybook(company: ProspectingCompanyItem, interactions: ProspectingCompanyView["allInteractions"]) {
+    const hasQuoteSignal = interactions.some((interaction) => interaction.outcome === "REQUESTED_QUOTE");
+    const hasOperationSignal = interactions.some((interaction) => interaction.outcome === "SHARED_OPERATION");
+
+    let focus = "Descubrir la operacion y quien decide";
+    let questions = [
+        "Que embarques o despachos mueve hoy y con que frecuencia?",
+        "Con quien trabaja actualmente y que le incomoda de ese servicio?",
+        "Quien revisa propuesta y quien toma la decision final?",
+    ];
+
+    if (company.importVolume === "HIGH" || (company.annualDams ?? 0) > 30) {
+        focus = "Abrir cuenta recurrente y no solo negocio spot";
+        questions = [
+            "Cuantos embarques o DAMs mueve al mes y en que rutas principales?",
+            "Que KPI le duele mas hoy: costo, tiempos, libres o observaciones?",
+            "Si mejoramos esa parte, que tan viable es probar con una operacion piloto?",
+        ];
+    } else if (company.valueDriver === "SPEED") {
+        focus = "Vender velocidad, control y respuesta operativa";
+        questions = [
+            "En que parte pierde mas tiempo hoy: cotizacion, embarque, arribo o levante?",
+            "Que urgencias le han costado sobrecosto recientemente?",
+            "Que tendria que pasar para que nos pruebe en una operacion sensible?",
+        ];
+    } else if (company.valueDriver === "PRICE") {
+        focus = "Bajar a comparativo economico concreto sin regalar margen a ciegas";
+        questions = [
+            "Que concepto siente hoy mas inflado en su operacion?",
+            "Compara solo tarifa o tambien dias libres, seguimiento y respuesta?",
+            "Si le mostramos ahorro real en una ruta puntual, quien aprueba la prueba?",
+        ];
+    }
+
+    const convertSignal = hasQuoteSignal
+        ? "Ya hay senal de cotizacion. Empuja cierre o abre oportunidad formal."
+        : hasOperationSignal
+            ? "Ya hay operacion concreta. Falta amarrar decisor o siguiente paso."
+            : "Aun falta aterrizar una necesidad concreta antes de convertir.";
+
+    return { focus, questions, convertSignal };
 }
 
 export default function ProspectingClient({ initialCompanies }: { initialCompanies: ProspectingCompanyItem[] }) {
@@ -70,8 +230,8 @@ export default function ProspectingClient({ initialCompanies }: { initialCompani
             searchQuery,
             item.company.businessName,
             item.company.documentNumber,
-            item.company.contacts.map((contact) => `${contact.firstName} ${contact.lastName} ${contact.emails.join(" ")} ${contact.phones.join(" ")}`),
-            item.allInteractions.map((interaction) => interaction.notes || "")
+            item.company.contacts.map((contact) => `${contact.firstName} ${contact.lastName} ${contact.emails.join(" ")} ${contact.phones.join(" ")} ${CONTACT_STATUS_LABELS[contact.commercialStatus]} ${BUYING_ROLE_LABELS[contact.buyingRole]}`),
+            item.allInteractions.map((interaction) => `${interaction.notes || ""} ${interaction.outcome ? OUTCOME_LABELS[interaction.outcome] : ""}`)
         )
     );
     const grouped = {
@@ -114,6 +274,8 @@ export default function ProspectingClient({ initialCompanies }: { initialCompani
                                 </TableRow>
                             ) : paginatedData.map(({ company, lastInteraction, nextTask, allInteractions, nextTaskFormattedDate }) => {
                                 const contacts = company.contacts.filter((contact) => contact.emails.length > 0 || contact.phones.length > 0);
+                                const readiness = getCompanyReadiness(company, allInteractions);
+                                const bestOpportunityContact = getBestOpportunityContact(company);
                                 const isExpanded = expandedCompanies.has(company.id);
                                 const isOverdue = Boolean(nextTaskFormattedDate && nextTaskFormattedDate < todayDate);
                                 const isToday = Boolean(nextTaskFormattedDate && nextTaskFormattedDate === todayDate);
@@ -130,7 +292,13 @@ export default function ProspectingClient({ initialCompanies }: { initialCompani
                                                         <div className="mt-2 flex gap-2">
                                                             {company.importVolume === "HIGH" && <Badge variant="secondary" className="bg-emerald-100 text-[10px] text-emerald-800">Volumen Alto</Badge>}
                                                             {company.valueDriver === "PRICE" && <Badge variant="secondary" className="bg-blue-100 text-[10px] text-blue-800">Busca Precio</Badge>}
+                                                            <Badge variant="outline" className={readiness.tone}>
+                                                                {readiness.label}
+                                                            </Badge>
                                                         </div>
+                                                        <p className="mt-2 text-[10px] text-muted-foreground">
+                                                            {readiness.description}
+                                                        </p>
                                                     </div>
                                                 </div>
                                             </TableCell>
@@ -143,6 +311,12 @@ export default function ProspectingClient({ initialCompanies }: { initialCompani
                                                                 <div className="group mb-1 flex items-center justify-between font-semibold">
                                                                     <div className="flex items-center gap-1">
                                                                         {contact.firstName} {contact.lastName}
+                                                                        <Badge variant="outline" className={`ml-1 h-4 text-[9px] ${CONTACT_STATUS_STYLES[contact.commercialStatus]}`}>
+                                                                            {CONTACT_STATUS_LABELS[contact.commercialStatus]}
+                                                                        </Badge>
+                                                                        <Badge variant="outline" className="h-4 text-[9px]">
+                                                                            {BUYING_ROLE_LABELS[contact.buyingRole]}
+                                                                        </Badge>
                                                                         {contact.linkedin && (
                                                                             <a href={contact.linkedin.startsWith("http") ? contact.linkedin : `https://${contact.linkedin}`} target="_blank" rel="noopener noreferrer" className="ml-1 text-blue-600 hover:text-blue-800" title="Perfil de LinkedIn">
                                                                                 <Linkedin className="inline h-3 w-3" />
@@ -156,6 +330,11 @@ export default function ProspectingClient({ initialCompanies }: { initialCompani
                                                                         <Link href={`/contacts/${contact.id}`} className="text-muted-foreground hover:text-blue-600" title="Editar Contacto"><Pencil className="h-3 w-3" /></Link>
                                                                     </div>
                                                                 </div>
+                                                                {contact.lastValidatedAt && (
+                                                                    <p className="pl-4 text-[10px] text-muted-foreground">
+                                                                        Validado: {new Date(contact.lastValidatedAt).toLocaleDateString("es-PE")}
+                                                                    </p>
+                                                                )}
                                                                 {contact.phones.map((phone, index) => (
                                                                     <div key={`${contact.id}-phone-${index}`} className="group mb-1 flex items-center justify-between pl-4 text-xs text-muted-foreground">
                                                                         <div className="flex items-center gap-2"><PhoneCall className="h-3 w-3" /><span>{phone}</span></div>
@@ -211,7 +390,7 @@ export default function ProspectingClient({ initialCompanies }: { initialCompani
                                             <TableCell className="min-h-full text-right">
                                                 <div className="flex flex-col items-end justify-center gap-2">
                                                     <CreateTaskModal companyId={company.id} contacts={contacts} defaultContactId="none" isSimplePostpone onSuccess={() => setPostponedIds((prev) => new Set(prev).add(company.id))} triggerButton={<Button size="sm" variant="outline" className="h-8 w-[140px] border-dashed border-primary/50 text-primary"><Calendar className="mr-1 h-3 w-3" /> Posponer Cuenta</Button>} />
-                                                    <Button variant="ghost" size="sm" className="h-7 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700" asChild><Link href={`/crm/opportunities/new?companyId=${company.id}`}><TrendingUp className="mr-1 h-3 w-3" /> Convertir a Oportunidad</Link></Button>
+                                                    <Button variant={readiness.ready ? "default" : "ghost"} size="sm" className={readiness.ready ? "h-8 bg-emerald-600 hover:bg-emerald-700" : "h-7 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"} asChild><Link href={`/crm/opportunities/new?companyId=${company.id}${bestOpportunityContact ? `&contactId=${bestOpportunityContact.id}` : ""}`}>{readiness.ready ? <><TrendingUp className="mr-1 h-3 w-3" /> Abrir Oportunidad</> : <><TrendingUp className="mr-1 h-3 w-3" /> Aun verde</>}</Link></Button>
                                                     <DisqualifyModal companyId={company.id} companyName={company.businessName} onSuccess={() => setPostponedIds((prev) => new Set(prev).add(company.id))} triggerButton={<Button variant="ghost" size="sm" className="h-7 text-red-500 hover:bg-red-50 hover:text-red-700"><Trash2 className="mr-1 h-3 w-3" /> Descartar</Button>} />
                                                 </div>
                                             </TableCell>
@@ -221,6 +400,58 @@ export default function ProspectingClient({ initialCompanies }: { initialCompani
                                             <TableRow key={`${company.id}-timeline`}>
                                                 <TableCell colSpan={5} className="bg-muted/30 p-0">
                                                     <div className="px-6 py-4">
+                                                        <div className="mb-4 grid gap-4 lg:grid-cols-2">
+                                                            <div className="rounded-lg border bg-background p-4">
+                                                                <h4 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                                                    <UserRoundSearch className="h-3.5 w-3.5" /> Cobertura de Cuenta
+                                                                </h4>
+                                                                <div className="grid grid-cols-2 gap-3 text-xs">
+                                                                    <div className="rounded-md bg-muted/40 p-3">
+                                                                        <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Validados</span>
+                                                                        <span className="text-lg font-semibold">{getCoverageSummary(company).validated}</span>
+                                                                    </div>
+                                                                    <div className="rounded-md bg-muted/40 p-3">
+                                                                        <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Decisores</span>
+                                                                        <span className="text-lg font-semibold">{getCoverageSummary(company).decisionMakers}</span>
+                                                                    </div>
+                                                                    <div className="rounded-md bg-muted/40 p-3">
+                                                                        <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Influenciadores</span>
+                                                                        <span className="text-lg font-semibold">{getCoverageSummary(company).influencers}</span>
+                                                                    </div>
+                                                                    <div className="rounded-md bg-muted/40 p-3">
+                                                                        <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Operaciones</span>
+                                                                        <span className="text-lg font-semibold">{getCoverageSummary(company).operations}</span>
+                                                                    </div>
+                                                                </div>
+                                                                <p className="mt-3 text-xs text-muted-foreground">
+                                                                    {getCoverageSummary(company).decisionMakers > 0
+                                                                        ? "La cuenta ya tiene al menos un decisor identificado."
+                                                                        : "Todavia falta alguien que realmente mueva la compra."}
+                                                                </p>
+                                                            </div>
+
+                                                            <div className="rounded-lg border bg-background p-4">
+                                                                <h4 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                                                    <ClipboardList className="h-3.5 w-3.5" /> Playbook de Descubrimiento
+                                                                </h4>
+                                                                <div className="rounded-md bg-blue-50 p-3 text-xs text-blue-900">
+                                                                    <span className="block text-[10px] uppercase tracking-wider text-blue-700">Foco</span>
+                                                                    <p className="mt-1 font-medium">{getDiscoveryPlaybook(company, allInteractions).focus}</p>
+                                                                </div>
+                                                                <div className="mt-3 space-y-2">
+                                                                    {getDiscoveryPlaybook(company, allInteractions).questions.map((question) => (
+                                                                        <div key={question} className="flex items-start gap-2 text-xs text-foreground">
+                                                                            <Target className="mt-0.5 h-3.5 w-3.5 text-blue-600" />
+                                                                            <span>{question}</span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                                <p className="mt-3 text-xs text-muted-foreground">
+                                                                    {getDiscoveryPlaybook(company, allInteractions).convertSignal}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+
                                                         <h4 className="mb-3 flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-muted-foreground"><History className="h-3 w-3" /> Historial de Interacciones - {company.businessName}</h4>
                                                         <div className="relative ml-2 space-y-4 border-l-2 border-primary/20">
                                                             {allInteractions.map((interaction, index) => (
@@ -231,6 +462,7 @@ export default function ProspectingClient({ initialCompanies }: { initialCompani
                                                                             <span className="text-xs font-semibold">{interactionLabel(interaction.type)}</span>
                                                                             <span className="text-[10px] text-muted-foreground">{new Date(interaction.interactedAt).toLocaleDateString("es-PE", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</span>
                                                                             {interaction.contact && <Badge variant="outline" className="h-4 text-[10px]">con {interaction.contact.firstName} {interaction.contact.lastName}</Badge>}
+                                                                            {interaction.outcome && <Badge variant="outline" className="h-4 text-[10px]">{OUTCOME_LABELS[interaction.outcome]}</Badge>}
                                                                             {interaction.scoreImpact > 0 && <span className="text-[10px] font-bold text-emerald-600">+{interaction.scoreImpact} pts</span>}
                                                                         </div>
                                                                         {interaction.notes && <p className="text-xs leading-relaxed text-muted-foreground">{interaction.notes}</p>}

@@ -1,11 +1,14 @@
 import type {
     Prisma,
     CompanyType,
+    ContactBuyingRole,
+    ContactCommercialStatus,
     OpportunityServiceLine,
     ShipmentMode,
     OpportunityFrequency,
     FollowUpType,
     ImportVolume,
+    InteractionOutcome,
     InteractionType,
     TradeRole,
     ValueDriver,
@@ -33,6 +36,8 @@ export interface ContactListItem {
     emails: string[];
     phones: string[];
     isActive: boolean;
+    commercialStatus: ContactCommercialStatus;
+    buyingRole: ContactBuyingRole;
     company: {
         businessName: string;
     } | null;
@@ -79,11 +84,15 @@ export interface ProspectingContactItem {
     phones: string[];
     emails: string[];
     linkedin: string | null;
+    commercialStatus: ContactCommercialStatus;
+    buyingRole: ContactBuyingRole;
+    lastValidatedAt: Date | null;
 }
 
 export interface ProspectingInteractionItem {
     id: string;
     type: InteractionType;
+    outcome: InteractionOutcome | null;
     interactedAt: Date;
     scoreImpact: number;
     notes: string | null;
@@ -101,6 +110,8 @@ export interface ProspectingCompanyItem {
     id: string;
     documentNumber: string;
     businessName: string;
+    tradeRole: TradeRole;
+    annualDams: number | null;
     importVolume: ImportVolume;
     valueDriver: ValueDriver;
     leadScore: number;

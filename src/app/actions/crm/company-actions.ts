@@ -128,6 +128,8 @@ export async function getCompaniesByStatus(statuses: ProspectingStatus[]) {
                 id: true,
                 documentNumber: true,
                 businessName: true,
+                tradeRole: true,
+                annualDams: true,
                 importVolume: true,
                 valueDriver: true,
                 leadScore: true,
@@ -138,7 +140,10 @@ export async function getCompaniesByStatus(statuses: ProspectingStatus[]) {
                         lastName: true,
                         phones: true,
                         emails: true,
-                        linkedin: true
+                        linkedin: true,
+                        commercialStatus: true,
+                        buyingRole: true,
+                        lastValidatedAt: true,
                     }
                 },
                 interactions: {
@@ -146,11 +151,13 @@ export async function getCompaniesByStatus(statuses: ProspectingStatus[]) {
                     select: {
                         id: true,
                         type: true,
+                        outcome: true,
                         interactedAt: true,
                         scoreImpact: true,
                         notes: true,
                         nextFollowUpDate: true,
                         isFollowUpCompleted: true,
+                        contactId: true,
                         contact: { select: { firstName: true, lastName: true } }
                     }
                 },

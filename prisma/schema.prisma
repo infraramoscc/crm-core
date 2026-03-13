@@ -54,6 +54,26 @@ enum ValueDriver {
   UNKNOWN
 }
 
+enum ContactCommercialStatus {
+  UNVALIDATED
+  VALIDATED_NO_RESPONSE
+  VALIDATED_RESPONDS
+  INTERESTED
+  NOT_DECISION_MAKER
+  DECISION_MAKER
+  REPLACE
+  DISCARDED
+}
+
+enum ContactBuyingRole {
+  UNKNOWN
+  OPERATIONS
+  USER
+  INFLUENCER
+  DECISION_MAKER
+  BLOCKER
+}
+
 /// Representa a la Entidad / Empresa principal
 model Company {
   id             String      @id @default(uuid())
@@ -109,6 +129,9 @@ model Contact {
   isActive        Boolean @default(true)
   inactiveReason  String? /// Motivo por el cual el contacto fue descartado (Ej: "Rebotan correos", "Ya no trabaja")
   engagementScore Int     @default(0)
+  commercialStatus ContactCommercialStatus @default(UNVALIDATED)
+  buyingRole      ContactBuyingRole @default(UNKNOWN)
+  lastValidatedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -206,6 +229,20 @@ enum FollowUpType {
   OTHER
 }
 
+enum InteractionOutcome {
+  NO_RESPONSE
+  INVALID_PHONE
+  BOUNCED_EMAIL
+  VERIFIED_CONTACT
+  REFERRED_TO_OTHER
+  CALLBACK_REQUESTED
+  SHARED_OPERATION
+  REQUESTED_QUOTE
+  NO_INTEREST
+  HAS_CURRENT_VENDOR
+  OTHER
+}
+
 /// Registro de interacciones y Tareas Futuras (Follow-ups)
 model Interaction {
   id            String          @id @default(uuid())
@@ -213,6 +250,7 @@ model Interaction {
   contactId     String? /// A veces no hay un contacto formal aún
   opportunityId String? /// (Fase 2.5) Para enlazar la nota a una Cotización en curso
   type          InteractionType
+  outcome       InteractionOutcome?
   notes         String? /// Resumen de lo hablado y datos descubiertos
   scoreImpact   Int             @default(0) /// Ej: +5, -2, +20
   interactedAt  DateTime        @default(now()) /// Cuando paso la accion

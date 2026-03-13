@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
-import type { InteractionType } from "@prisma/client";
+import type { ContactBuyingRole, ContactCommercialStatus, InteractionOutcome, InteractionType } from "@prisma/client";
 
 /**
  * Crea una nueva interacción (nota del diario del cazador)
@@ -13,11 +13,14 @@ export async function createInteraction(data: {
     contactId?: string;
     opportunityId?: string;
     type: InteractionType;
+    outcome?: InteractionOutcome;
     notes: string;
     scoreImpact?: number;
     interactedAt?: string; // ISO date string
     nextFollowUpDate?: string; // ISO date string (including time)
     followUpType?: "CALL" | "EMAIL" | "MEETING" | "LINKEDIN" | "WHATSAPP" | "OTHER";
+    contactCommercialStatus?: ContactCommercialStatus;
+    contactBuyingRole?: ContactBuyingRole;
 }) {
     try {
         const interaction = await prisma.interaction.create({
@@ -26,6 +29,7 @@ export async function createInteraction(data: {
                 contactId: data.contactId || null,
                 opportunityId: data.opportunityId || null,
                 type: data.type,
+                outcome: data.outcome || null,
                 notes: data.notes,
                 scoreImpact: data.scoreImpact || 0,
                 interactedAt: data.interactedAt ? new Date(data.interactedAt) : new Date(),
@@ -34,6 +38,21 @@ export async function createInteraction(data: {
                 isFollowUpCompleted: false,
             }
         });
+
+        if (data.contactId && (data.contactCommercialStatus || data.contactBuyingRole)) {
+            await prisma.contact.update({
+                where: { id: data.contactId },
+                data: {
+                    commercialStatus: data.contactCommercialStatus,
+                    buyingRole: data.contactBuyingRole,
+                    lastValidatedAt: data.contactCommercialStatus
+                        ? data.contactCommercialStatus === "UNVALIDATED"
+                            ? null
+                            : new Date()
+                        : undefined,
+                },
+            });
+        }
 
         // Actualizar Lead Score de la empresa sumando el impacto
         if (data.scoreImpact && data.scoreImpact > 0) {
@@ -44,6 +63,15 @@ export async function createInteraction(data: {
                     // Si es la primera interacción, cambiar status a PROSPECTING
                     prospectingStatus: "PROSPECTING",
                 }
+            });
+        }
+
+        if (data.outcome === "REQUESTED_QUOTE") {
+            await prisma.company.update({
+                where: { id: data.companyId },
+                data: {
+                    prospectingStatus: "QUALIFIED",
+                },
             });
         }
 
@@ -65,6 +93,9 @@ export async function createInteraction(data: {
         revalidatePath("/crm/prospecting");
         revalidatePath("/crm/investigation");
         revalidatePath("/crm");
+        if (data.contactId) {
+            revalidatePath(`/contacts/${data.contactId}`);
+        }
         return { success: true, data: interaction };
     } catch (error) {
         console.error("Error creating interaction:", error);

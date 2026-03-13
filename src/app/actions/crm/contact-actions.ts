@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
-import type { InteractionType } from "@prisma/client";
+import type { ContactBuyingRole, ContactCommercialStatus, InteractionType } from "@prisma/client";
 
 export async function createContact(data: {
     companyId: string;
@@ -18,6 +18,8 @@ export async function createContact(data: {
     notes?: string;
     isActive?: boolean;
     inactiveReason?: string;
+    commercialStatus?: ContactCommercialStatus;
+    buyingRole?: ContactBuyingRole;
 }) {
     try {
         const contact = await prisma.contact.create({
@@ -34,7 +36,14 @@ export async function createContact(data: {
                 interests: data.interests || null,
                 notes: data.notes || null,
                 isActive: data.isActive ?? true,
-                inactiveReason: data.inactiveReason || null
+                inactiveReason: data.inactiveReason || null,
+                commercialStatus: data.commercialStatus || "UNVALIDATED",
+                buyingRole: data.buyingRole || "UNKNOWN",
+                lastValidatedAt: data.commercialStatus
+                    ? data.commercialStatus === "UNVALIDATED"
+                        ? null
+                        : new Date()
+                    : null,
             }
         });
 
@@ -142,6 +151,8 @@ export async function getAllContacts() {
                 emails: true,
                 phones: true,
                 isActive: true,
+                commercialStatus: true,
+                buyingRole: true,
                 company: {
                     select: { businessName: true }
                 }
@@ -189,6 +200,8 @@ export async function updateContact(id: string, data: {
     notes?: string;
     isActive?: boolean;
     inactiveReason?: string;
+    commercialStatus?: ContactCommercialStatus;
+    buyingRole?: ContactBuyingRole;
 }) {
     try {
         const contact = await prisma.contact.update({
@@ -206,7 +219,14 @@ export async function updateContact(id: string, data: {
                 interests: data.interests,
                 notes: data.notes,
                 isActive: data.isActive,
-                inactiveReason: data.inactiveReason
+                inactiveReason: data.inactiveReason,
+                commercialStatus: data.commercialStatus,
+                buyingRole: data.buyingRole,
+                lastValidatedAt: data.commercialStatus
+                    ? data.commercialStatus === "UNVALIDATED"
+                        ? null
+                        : new Date()
+                    : undefined,
             }
         });
 

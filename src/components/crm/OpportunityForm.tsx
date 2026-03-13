@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type {
     OpportunityFrequency,
     OpportunityServiceLine,
@@ -46,10 +46,13 @@ function toDateTimeLocalInput(value?: Date | null) {
 
 export function OpportunityForm({ initialData, companies, contacts }: OpportunityFormProps) {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const isEditing = Boolean(initialData);
     const [loading, setLoading] = useState(false);
-    const [companyId, setCompanyId] = useState(initialData?.companyId || companies[0]?.id || "");
-    const [contactId, setContactId] = useState(initialData?.contactId || "none");
+    const urlCompanyId = searchParams.get("companyId");
+    const urlContactId = searchParams.get("contactId");
+    const [companyId, setCompanyId] = useState(initialData?.companyId || urlCompanyId || companies[0]?.id || "");
+    const [contactId, setContactId] = useState(initialData?.contactId || urlContactId || "none");
     const [stage, setStage] = useState<OpportunityStage>(initialData?.stage || "PROSPECTING");
     const [serviceLine, setServiceLine] = useState<OpportunityServiceLine>(initialData?.serviceLine || "FORWARDING");
     const [shipmentMode, setShipmentMode] = useState<ShipmentMode>(initialData?.shipmentMode || "SEA");

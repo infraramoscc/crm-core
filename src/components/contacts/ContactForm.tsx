@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createContact, updateContact } from "@/app/actions/crm/contact-actions";
 import { useState } from "react";
 import type { CompanyOption, ContactDetail } from "@/lib/crm-list-types";
+import type { ContactBuyingRole, ContactCommercialStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,6 +29,8 @@ export function ContactForm({ initialData, companies = [] }: ContactFormProps) {
     const searchParams = useSearchParams();
     const router = useRouter();
     const [loading, setLoading] = useState(false);
+    const [commercialStatus, setCommercialStatus] = useState<ContactCommercialStatus>(initialData?.commercialStatus ?? "UNVALIDATED");
+    const [buyingRole, setBuyingRole] = useState<ContactBuyingRole>(initialData?.buyingRole ?? "UNKNOWN");
 
     // Estado de actividad del contacto
     const [isActive, setIsActive] = useState<boolean>(initialData?.isActive ?? true);
@@ -60,7 +63,9 @@ export function ContactForm({ initialData, companies = [] }: ContactFormProps) {
                 emails: parsedEmails,
                 phones: parsedPhones,
                 isActive,
-                inactiveReason: !isActive ? (formData.get("inactiveReason") as string) : undefined
+                inactiveReason: !isActive ? (formData.get("inactiveReason") as string) : undefined,
+                commercialStatus,
+                buyingRole,
             });
 
             if (res.success) {
@@ -84,7 +89,9 @@ export function ContactForm({ initialData, companies = [] }: ContactFormProps) {
                     emails: parsedEmails,
                     phones: parsedPhones,
                     isActive,
-                    inactiveReason: !isActive ? (formData.get("inactiveReason") as string) : undefined
+                    inactiveReason: !isActive ? (formData.get("inactiveReason") as string) : undefined,
+                    commercialStatus,
+                    buyingRole,
                 });
 
                 if (res.success) {
@@ -118,6 +125,42 @@ export function ContactForm({ initialData, companies = [] }: ContactFormProps) {
 
                         <TabsContent value="general" className="space-y-6 min-h-[450px]">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <Label>Estado comercial</Label>
+                                    <Select value={commercialStatus} onValueChange={(value) => setCommercialStatus(value as ContactCommercialStatus)}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="UNVALIDATED">Sin validar</SelectItem>
+                                            <SelectItem value="VALIDATED_NO_RESPONSE">Validado sin respuesta</SelectItem>
+                                            <SelectItem value="VALIDATED_RESPONDS">Validado y responde</SelectItem>
+                                            <SelectItem value="INTERESTED">Interesado</SelectItem>
+                                            <SelectItem value="NOT_DECISION_MAKER">No decide</SelectItem>
+                                            <SelectItem value="DECISION_MAKER">Decisor</SelectItem>
+                                            <SelectItem value="REPLACE">Reemplazar</SelectItem>
+                                            <SelectItem value="DISCARDED">Descartado</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label>Rol en la compra</Label>
+                                    <Select value={buyingRole} onValueChange={(value) => setBuyingRole(value as ContactBuyingRole)}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="UNKNOWN">Sin definir</SelectItem>
+                                            <SelectItem value="OPERATIONS">Operaciones</SelectItem>
+                                            <SelectItem value="USER">Usuario</SelectItem>
+                                            <SelectItem value="INFLUENCER">Influenciador</SelectItem>
+                                            <SelectItem value="DECISION_MAKER">Decisor</SelectItem>
+                                            <SelectItem value="BLOCKER">Bloqueador</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
                                 <div className="space-y-2">
                                     <Label htmlFor="firstName">Nombres *</Label>
                                     <Input

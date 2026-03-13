@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createInteraction } from "@/app/actions/crm/interaction-actions";
-import type { FollowUpType, InteractionType } from "@prisma/client";
+import type { ContactBuyingRole, ContactCommercialStatus, FollowUpType, InteractionOutcome, InteractionType } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -44,8 +44,11 @@ interface LogInteractionModalProps {
 export function LogInteractionModal({ companyId, opportunityId, contacts, onSuccess, triggerButton, defaultContactId, lockedContact }: LogInteractionModalProps) {
     const [open, setOpen] = useState(false);
     const [type, setType] = useState<InteractionType>("EMAIL_SENT"); // Por defecto correo enviado como seguimiento
+    const [outcome, setOutcome] = useState<InteractionOutcome>("NO_RESPONSE");
     const [notes, setNotes] = useState("");
     const [contactId, setContactId] = useState(defaultContactId || contacts[0]?.id || "");
+    const [contactCommercialStatus, setContactCommercialStatus] = useState<ContactCommercialStatus>("VALIDATED_NO_RESPONSE");
+    const [contactBuyingRole, setContactBuyingRole] = useState<ContactBuyingRole>("UNKNOWN");
     // Tarea Futura
     const [createTask, setCreateTask] = useState(false);
     const [nextFollowUpDate, setNextFollowUpDate] = useState("");
@@ -75,11 +78,14 @@ export function LogInteractionModal({ companyId, opportunityId, contacts, onSucc
             contactId: contactId && contactId !== "none" ? contactId : undefined,
             opportunityId,
             type,
+            outcome,
             notes,
             scoreImpact: getScoreImpact(type),
             interactedAt: new Date().toISOString(),
             nextFollowUpDate: createTask && nextFollowUpDate ? new Date(nextFollowUpDate).toISOString() : undefined,
             followUpType: createTask && nextFollowUpDate ? followUpType : undefined,
+            contactCommercialStatus: contactId && contactId !== "none" ? contactCommercialStatus : undefined,
+            contactBuyingRole: contactId && contactId !== "none" ? contactBuyingRole : undefined,
         });
 
         setLoading(false);
@@ -88,6 +94,9 @@ export function LogInteractionModal({ companyId, opportunityId, contacts, onSucc
             setOpen(false);
             setNotes("");
             setNextFollowUpDate("");
+            setOutcome("NO_RESPONSE");
+            setContactCommercialStatus("VALIDATED_NO_RESPONSE");
+            setContactBuyingRole("UNKNOWN");
             if (onSuccess) onSuccess();
         } else {
             alert("Error guardando la interacción.");
@@ -145,6 +154,66 @@ export function LogInteractionModal({ companyId, opportunityId, contacts, onSucc
                                             {c.firstName} {c.lastName}
                                         </SelectItem>
                                     ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                        <div className="space-y-2">
+                            <Label>Resultado</Label>
+                            <Select value={outcome} onValueChange={(value) => setOutcome(value as InteractionOutcome)}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="NO_RESPONSE">No respondio</SelectItem>
+                                    <SelectItem value="INVALID_PHONE">Numero invalido</SelectItem>
+                                    <SelectItem value="BOUNCED_EMAIL">Correo rebotado</SelectItem>
+                                    <SelectItem value="VERIFIED_CONTACT">Contacto validado</SelectItem>
+                                    <SelectItem value="REFERRED_TO_OTHER">Derivo a otra persona</SelectItem>
+                                    <SelectItem value="CALLBACK_REQUESTED">Pidio retomar</SelectItem>
+                                    <SelectItem value="SHARED_OPERATION">Compartio operacion</SelectItem>
+                                    <SelectItem value="REQUESTED_QUOTE">Pidio cotizacion</SelectItem>
+                                    <SelectItem value="NO_INTEREST">Sin interes</SelectItem>
+                                    <SelectItem value="HAS_CURRENT_VENDOR">Ya trabaja con otro operador</SelectItem>
+                                    <SelectItem value="OTHER">Otro</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Estado comercial</Label>
+                            <Select value={contactCommercialStatus} onValueChange={(value) => setContactCommercialStatus(value as ContactCommercialStatus)}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="UNVALIDATED">Sin validar</SelectItem>
+                                    <SelectItem value="VALIDATED_NO_RESPONSE">Validado sin respuesta</SelectItem>
+                                    <SelectItem value="VALIDATED_RESPONDS">Validado y responde</SelectItem>
+                                    <SelectItem value="INTERESTED">Interesado</SelectItem>
+                                    <SelectItem value="NOT_DECISION_MAKER">No decide</SelectItem>
+                                    <SelectItem value="DECISION_MAKER">Decisor</SelectItem>
+                                    <SelectItem value="REPLACE">Reemplazar</SelectItem>
+                                    <SelectItem value="DISCARDED">Descartado</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Rol de compra</Label>
+                            <Select value={contactBuyingRole} onValueChange={(value) => setContactBuyingRole(value as ContactBuyingRole)}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="UNKNOWN">Sin definir</SelectItem>
+                                    <SelectItem value="OPERATIONS">Operaciones</SelectItem>
+                                    <SelectItem value="USER">Usuario</SelectItem>
+                                    <SelectItem value="INFLUENCER">Influenciador</SelectItem>
+                                    <SelectItem value="DECISION_MAKER">Decisor</SelectItem>
+                                    <SelectItem value="BLOCKER">Bloqueador</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
