@@ -72,8 +72,8 @@ export function TaskNotificationsBell() {
 
     const pendingCount = dueToday.length + overdue.length;
 
-    const formatTime = (isoString: string) => {
-        const d = new Date(isoString);
+    const formatTime = (value: string | Date) => {
+        const d = new Date(value);
         return d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
     };
 
@@ -127,7 +127,7 @@ export function TaskNotificationsBell() {
                                 <div className="flex justify-between w-full">
                                     <span className="font-semibold text-sm">{t.company?.businessName}</span>
                                     <span className="text-xs text-amber-600 flex items-center gap-1 font-bold">
-                                        <CalendarClock className="h-3 w-3" /> {formatTime(t.nextFollowUpDate)}
+                                        <CalendarClock className="h-3 w-3" /> {t.nextFollowUpDate ? formatTime(t.nextFollowUpDate) : "--:--"}
                                     </span>
                                 </div>
                                 <span className="text-xs text-muted-foreground">

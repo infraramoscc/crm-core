@@ -133,7 +133,7 @@ export function ContactForm({ initialData, companies = [] }: ContactFormProps) {
                                     <Input
                                         id="lastName"
                                         name="lastName"
-                                        defaultValue={initialData?.lastName}
+                                        defaultValue={initialData?.lastName ?? ""}
                                         placeholder="Ej. Ramírez"
                                     />
                                 </div>
@@ -159,7 +159,7 @@ export function ContactForm({ initialData, companies = [] }: ContactFormProps) {
                                     <Input
                                         id="position"
                                         name="position"
-                                        defaultValue={initialData?.position}
+                                        defaultValue={initialData?.position ?? ""}
                                         placeholder="Ej. Gerente de Importaciones"
                                     />
                                 </div>
@@ -168,7 +168,7 @@ export function ContactForm({ initialData, companies = [] }: ContactFormProps) {
                                     <Input
                                         id="linkedin"
                                         name="linkedin"
-                                        defaultValue={initialData?.linkedin}
+                                        defaultValue={initialData?.linkedin ?? ""}
                                         placeholder="https://linkedin.com/in/..."
                                     />
                                 </div>
@@ -214,7 +214,7 @@ export function ContactForm({ initialData, companies = [] }: ContactFormProps) {
                                         <Input
                                             id="inactiveReason"
                                             name="inactiveReason"
-                                            defaultValue={initialData?.inactiveReason}
+                                            defaultValue={initialData?.inactiveReason ?? ""}
                                             placeholder="Ej. Rebotan correos, no labora aquí, ya no importa..."
                                             required={!isActive}
                                         />
@@ -251,7 +251,7 @@ export function ContactForm({ initialData, companies = [] }: ContactFormProps) {
                                     <Textarea
                                         id="interests"
                                         name="interests"
-                                        defaultValue={initialData?.interests}
+                                        defaultValue={initialData?.interests ?? ""}
                                         placeholder="Deportes, Hobbies, Vinos preferidos..."
                                         className="min-h-[80px]"
                                     />
@@ -262,7 +262,7 @@ export function ContactForm({ initialData, companies = [] }: ContactFormProps) {
                                     <Textarea
                                         id="notes"
                                         name="notes"
-                                        defaultValue={initialData?.notes}
+                                        defaultValue={initialData?.notes ?? ""}
                                         placeholder="Preferencias de negociación, horarios de contacto, objeciones previas..."
                                         className="min-h-[120px]"
                                     />

@@ -72,12 +72,19 @@ export default function TasksClient({ initialTasks }: { initialTasks: TaskItem[]
         return new Date(t.nextFollowUpDate) > new Date() && !dueToday.includes(t);
     });
 
-    const formatTime = (isoString: string) => {
-        const d = new Date(isoString);
+    const formatTime = (value: string | Date) => {
+        const d = new Date(value);
         return d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
     };
 
-    const renderTaskCard = (t: TaskItem, isOverdue: boolean) => (
+    const renderTaskCard = (t: TaskItem, isOverdue: boolean) => {
+        if (!t.nextFollowUpDate) {
+            return null;
+        }
+
+        const followUpDate = new Date(t.nextFollowUpDate);
+
+        return (
         <Card key={t.id} className={`group hover:shadow-md transition-shadow ${isOverdue ? 'border-red-200 bg-red-50/10' : ''}`}>
             <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-start gap-4 flex-1">
@@ -90,7 +97,7 @@ export default function TasksClient({ initialTasks }: { initialTasks: TaskItem[]
                         <div className="flex items-center gap-2 mb-1">
                             <span className={`text-sm font-bold ${isOverdue ? 'text-red-600' : 'text-amber-600'}`}>
                                 {isOverdue && <span className="mr-1">⚠️ Atrasada:</span>}
-                                {format(new Date(t.nextFollowUpDate), "EEEE d 'de' MMMM", { locale: es })} a las {formatTime(t.nextFollowUpDate)}
+                                {format(followUpDate, "EEEE d 'de' MMMM", { locale: es })} a las {formatTime(t.nextFollowUpDate)}
                             </span>
                             <Badge variant="outline" className="text-[10px] hidden sm:inline-flex">
                                 {t.followUpType}
@@ -128,7 +135,8 @@ export default function TasksClient({ initialTasks }: { initialTasks: TaskItem[]
                 </div>
             </CardContent>
         </Card>
-    );
+        );
+    };
 
     return (
         <div className="flex flex-col gap-6 max-w-4xl mx-auto">

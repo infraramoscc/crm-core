@@ -58,7 +58,20 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
         if (isEditing && initialData?.id) {
             result = await updateCompany(initialData.id, companyData);
         } else {
-            result = await createCompany(companyData);
+            result = await createCompany({
+                businessName: companyData.businessName ?? "",
+                documentType: companyData.documentType ?? "RUC",
+                documentNumber: companyData.documentNumber ?? "",
+                companyType: companyData.companyType,
+                tradeRole: companyData.tradeRole,
+                annualDams: companyData.annualDams,
+                legalRepresentative: companyData.legalRepresentative,
+                importVolume: companyData.importVolume,
+                valueDriver: companyData.valueDriver,
+                strategyTags: companyData.strategyTags,
+                tradeName: companyData.tradeName,
+                website: companyData.website,
+            });
         }
 
         setLoading(false);
@@ -132,7 +145,7 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
                                     <Input
                                         id="tradeName"
                                         name="tradeName"
-                                        defaultValue={initialData?.tradeName}
+                                        defaultValue={initialData?.tradeName ?? ""}
                                         placeholder="Ej. Global Imports"
                                     />
                                 </div>
@@ -141,7 +154,7 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
                                     <Input
                                         id="legalRepresentative"
                                         name="legalRepresentative"
-                                        defaultValue={initialData?.legalRepresentative}
+                                        defaultValue={initialData?.legalRepresentative ?? ""}
                                         placeholder="Ej. Juan Pérez"
                                     />
                                 </div>
@@ -173,7 +186,7 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
 
                                 <div className="space-y-2">
                                     <Label htmlFor="companyType">Tipo de Entidad *</Label>
-                                    <Select value={companyType} onValueChange={setCompanyType}>
+                                    <Select value={companyType} onValueChange={(value) => setCompanyType(value as CompanyType)}>
                                         <SelectTrigger>
                                             <SelectValue placeholder="Selecciona el tipo" />
                                         </SelectTrigger>
@@ -213,13 +226,13 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
                                         <Input
                                             id="address"
                                             name="address"
-                                            defaultValue={initialData?.address}
+                                            defaultValue={initialData?.address ?? ""}
                                             placeholder="Ej. Av. Principal 123"
                                         />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="city">Ciudad / Provincia</Label>
-                                        <Input id="city" name="city" defaultValue={initialData?.city} placeholder="Ej. Lima" />
+                                        <Input id="city" name="city" defaultValue={initialData?.city ?? ""} placeholder="Ej. Lima" />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="countryCode">País (Código ISO)</Label>
@@ -281,7 +294,7 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
                                     <Input
                                         id="strategyTags"
                                         name="strategyTags"
-                                        defaultValue={initialData?.strategyTags}
+                                        defaultValue={initialData?.strategyTags ?? ""}
                                         placeholder="Ej. Pelea mucho los libres"
                                         className="bg-background"
                                     />
