@@ -6,7 +6,10 @@ import type {
     ContactBuyingRole,
     ContactCommercialStatus,
     FollowUpType,
+    InteractionDirection,
     InteractionOutcome,
+    InteractionPurpose,
+    InteractionStageContext,
     InteractionType,
 } from "@prisma/client";
 import { Button } from "@/components/ui/button";
@@ -41,6 +44,9 @@ export interface LogInteractionSuccessPayload {
     interaction: {
         id: string;
         type: InteractionType;
+        stageContext: InteractionStageContext;
+        direction: InteractionDirection;
+        purpose: InteractionPurpose;
         outcome: InteractionOutcome | null;
         interactedAt: Date;
         scoreImpact: number;
@@ -83,6 +89,9 @@ export function LogInteractionModal({
 }: LogInteractionModalProps) {
     const [open, setOpen] = useState(false);
     const [type, setType] = useState<InteractionType>("EMAIL_SENT");
+    const [stageContext, setStageContext] = useState<InteractionStageContext>(opportunityId ? "OPPORTUNITY" : "PROSPECTING");
+    const [direction, setDirection] = useState<InteractionDirection>("OUTBOUND");
+    const [purpose, setPurpose] = useState<InteractionPurpose>(opportunityId ? "QUOTE" : "FOLLOW_UP");
     const [outcome, setOutcome] = useState<InteractionOutcome>("NO_RESPONSE");
     const [notes, setNotes] = useState("");
     const [contactId, setContactId] = useState(defaultContactId || contacts[0]?.id || "");
@@ -118,6 +127,9 @@ export function LogInteractionModal({
         setNotes("");
         setNextFollowUpDate("");
         setOutcome("NO_RESPONSE");
+        setStageContext(opportunityId ? "OPPORTUNITY" : "PROSPECTING");
+        setDirection("OUTBOUND");
+        setPurpose(opportunityId ? "QUOTE" : "FOLLOW_UP");
         setContactCommercialStatus("VALIDATED_NO_RESPONSE");
         setContactBuyingRole("UNKNOWN");
         setCreateTask(false);
@@ -137,6 +149,9 @@ export function LogInteractionModal({
             contactId: safeContactId,
             opportunityId,
             type,
+            stageContext,
+            direction,
+            purpose,
             outcome,
             notes,
             scoreImpact,
@@ -159,6 +174,9 @@ export function LogInteractionModal({
             interaction: {
                 id: result.data.id,
                 type,
+                stageContext,
+                direction,
+                purpose,
                 outcome,
                 interactedAt: new Date(result.data.interactedAt),
                 scoreImpact,
@@ -239,6 +257,57 @@ export function LogInteractionModal({
                                             {contact.firstName} {contact.lastName}
                                         </SelectItem>
                                     ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                        <div className="space-y-2">
+                            <Label>Etapa</Label>
+                            <Select value={stageContext} onValueChange={(value) => setStageContext(value as InteractionStageContext)}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="INVESTIGATION">Investigacion</SelectItem>
+                                    <SelectItem value="PROSPECTING">Caceria</SelectItem>
+                                    <SelectItem value="OPPORTUNITY">Oportunidad</SelectItem>
+                                    <SelectItem value="POST_SALE">Post venta</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Direccion</Label>
+                            <Select value={direction} onValueChange={(value) => setDirection(value as InteractionDirection)}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="OUTBOUND">Saliente</SelectItem>
+                                    <SelectItem value="INBOUND">Entrante</SelectItem>
+                                    <SelectItem value="INTERNAL">Interna</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Proposito</Label>
+                            <Select value={purpose} onValueChange={(value) => setPurpose(value as InteractionPurpose)}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="RESEARCH">Investigacion</SelectItem>
+                                    <SelectItem value="VALIDATION">Validacion</SelectItem>
+                                    <SelectItem value="FOLLOW_UP">Seguimiento</SelectItem>
+                                    <SelectItem value="DISCOVERY">Descubrimiento</SelectItem>
+                                    <SelectItem value="QUOTE">Cotizacion</SelectItem>
+                                    <SelectItem value="NEGOTIATION">Negociacion</SelectItem>
+                                    <SelectItem value="RELATIONSHIP">Relacion</SelectItem>
+                                    <SelectItem value="TASK">Tarea</SelectItem>
+                                    <SelectItem value="OTHER">Otro</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>

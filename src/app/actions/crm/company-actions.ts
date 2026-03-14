@@ -193,6 +193,9 @@ export async function getCompaniesByStatus(statuses: ProspectingStatus[]) {
                     select: {
                         id: true,
                         type: true,
+                        stageContext: true,
+                        direction: true,
+                        purpose: true,
                         outcome: true,
                         interactedAt: true,
                         scoreImpact: true,

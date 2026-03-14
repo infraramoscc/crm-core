@@ -12,8 +12,11 @@ import type {
     ShipmentMode,
     OpportunityFrequency,
     FollowUpType,
+    InteractionDirection,
     ImportVolume,
     InteractionOutcome,
+    InteractionPurpose,
+    InteractionStageContext,
     InteractionType,
     ResearchEffort,
     ResearchPriority,
@@ -152,6 +155,9 @@ export interface ProspectingContactItem {
 export interface ProspectingInteractionItem {
     id: string;
     type: InteractionType;
+    stageContext: InteractionStageContext;
+    direction: InteractionDirection;
+    purpose: InteractionPurpose;
     outcome: InteractionOutcome | null;
     interactedAt: Date;
     scoreImpact: number;

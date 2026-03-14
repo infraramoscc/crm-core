@@ -2,7 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
-import type { ContactBuyingRole, ContactCommercialStatus, InteractionOutcome, InteractionType } from "@prisma/client";
+import type {
+    ContactBuyingRole,
+    ContactCommercialStatus,
+    InteractionDirection,
+    InteractionOutcome,
+    InteractionPurpose,
+    InteractionStageContext,
+    InteractionType,
+} from "@prisma/client";
 
 /**
  * Crea una nueva interacción (nota del diario del cazador)
@@ -13,6 +21,9 @@ export async function createInteraction(data: {
     contactId?: string;
     opportunityId?: string;
     type: InteractionType;
+    stageContext?: InteractionStageContext;
+    direction?: InteractionDirection;
+    purpose?: InteractionPurpose;
     outcome?: InteractionOutcome;
     notes: string;
     scoreImpact?: number;
@@ -29,6 +40,9 @@ export async function createInteraction(data: {
                 contactId: data.contactId || null,
                 opportunityId: data.opportunityId || null,
                 type: data.type,
+                stageContext: data.stageContext || (data.opportunityId ? "OPPORTUNITY" : "PROSPECTING"),
+                direction: data.direction || "OUTBOUND",
+                purpose: data.purpose || (data.nextFollowUpDate ? "TASK" : "FOLLOW_UP"),
                 outcome: data.outcome || null,
                 notes: data.notes,
                 scoreImpact: data.scoreImpact || 0,

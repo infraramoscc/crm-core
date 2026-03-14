@@ -6,6 +6,9 @@ import type {
     ContactBuyingRole,
     ContactCommercialStatus,
     DecisionStyle,
+    InteractionDirection,
+    InteractionPurpose,
+    InteractionStageContext,
     InteractionType,
     PreferredContactChannel,
     PreferredContactWindow,
@@ -193,6 +196,9 @@ export async function logInteraction(data: {
     contactId?: string;
     opportunityId?: string;
     type: InteractionType;
+    stageContext?: InteractionStageContext;
+    direction?: InteractionDirection;
+    purpose?: InteractionPurpose;
     notes?: string;
     scoreImpact: number;
     interactedAt: Date;
@@ -202,6 +208,9 @@ export async function logInteraction(data: {
         const interaction = await prisma.interaction.create({
             data: {
                 ...data,
+                stageContext: data.stageContext || (data.opportunityId ? "OPPORTUNITY" : "PROSPECTING"),
+                direction: data.direction || "OUTBOUND",
+                purpose: data.purpose || (data.nextFollowUpDate ? "TASK" : "FOLLOW_UP"),
                 // Default value for completed status if it has follow up
                 isFollowUpCompleted: data.nextFollowUpDate ? false : true
             }

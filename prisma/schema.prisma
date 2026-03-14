@@ -331,6 +331,31 @@ enum InteractionType {
   WHATSAPP_SENT
 }
 
+enum InteractionStageContext {
+  INVESTIGATION
+  PROSPECTING
+  OPPORTUNITY
+  POST_SALE
+}
+
+enum InteractionDirection {
+  OUTBOUND
+  INBOUND
+  INTERNAL
+}
+
+enum InteractionPurpose {
+  RESEARCH
+  VALIDATION
+  FOLLOW_UP
+  DISCOVERY
+  QUOTE
+  NEGOTIATION
+  RELATIONSHIP
+  TASK
+  OTHER
+}
+
 enum FollowUpType {
   CALL
   EMAIL
@@ -361,6 +386,9 @@ model Interaction {
   contactId     String? /// A veces no hay un contacto formal aún
   opportunityId String? /// (Fase 2.5) Para enlazar la nota a una Cotización en curso
   type          InteractionType
+  stageContext  InteractionStageContext @default(PROSPECTING)
+  direction     InteractionDirection    @default(OUTBOUND)
+  purpose       InteractionPurpose      @default(FOLLOW_UP)
   outcome       InteractionOutcome?
   notes         String? /// Resumen de lo hablado y datos descubiertos
   scoreImpact   Int             @default(0) /// Ej: +5, -2, +20

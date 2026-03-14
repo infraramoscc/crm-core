@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createInteraction } from "@/app/actions/crm/interaction-actions";
-import type { FollowUpType } from "@prisma/client";
+import type { FollowUpType, InteractionDirection, InteractionPurpose, InteractionStageContext } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,19 +31,22 @@ interface TaskContactOption {
 }
 
 export interface CreateTaskSuccessPayload {
-    interaction: {
-        id: string;
-        type: "SYSTEM_NOTE";
-        outcome: null;
-        interactedAt: Date;
+        interaction: {
+            id: string;
+            type: "SYSTEM_NOTE";
+            stageContext: InteractionStageContext;
+            direction: InteractionDirection;
+            purpose: InteractionPurpose;
+            outcome: null;
+            interactedAt: Date;
         scoreImpact: number;
         notes: string;
         nextFollowUpDate: Date;
         isFollowUpCompleted: boolean;
         followUpType: FollowUpType;
-        contactId: string | null;
-        contact: {
-            firstName: string;
+            contactId: string | null;
+            contact: {
+                firstName: string;
             lastName: string;
         } | null;
     };
@@ -56,6 +59,8 @@ interface CreateTaskModalProps {
     triggerButton?: React.ReactNode;
     defaultContactId?: string;
     isSimplePostpone?: boolean;
+    stageContext?: InteractionStageContext;
+    purpose?: InteractionPurpose;
 }
 
 export function CreateTaskModal({
@@ -65,6 +70,8 @@ export function CreateTaskModal({
     triggerButton,
     defaultContactId,
     isSimplePostpone,
+    stageContext,
+    purpose,
 }: CreateTaskModalProps) {
     const [open, setOpen] = useState(false);
     const [nextFollowUpDate, setNextFollowUpDate] = useState("");
@@ -85,6 +92,9 @@ export function CreateTaskModal({
             companyId,
             contactId: safeContactId,
             type: "SYSTEM_NOTE",
+            stageContext: stageContext || "PROSPECTING",
+            direction: "INTERNAL",
+            purpose: purpose || "TASK",
             notes: taskNotes,
             interactedAt: new Date().toISOString(),
             nextFollowUpDate: new Date(nextFollowUpDate).toISOString(),
@@ -103,6 +113,9 @@ export function CreateTaskModal({
             interaction: {
                 id: result.data.id,
                 type: "SYSTEM_NOTE",
+                stageContext: stageContext || "PROSPECTING",
+                direction: "INTERNAL",
+                purpose: purpose || "TASK",
                 outcome: null,
                 interactedAt: new Date(result.data.interactedAt),
                 scoreImpact: 0,

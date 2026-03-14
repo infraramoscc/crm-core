@@ -41,6 +41,14 @@ function MetricCard({
   );
 }
 
+function formatMetricValue(value: number | null, suffix = "") {
+  if (value === null) {
+    return "-";
+  }
+
+  return `${value}${suffix}`;
+}
+
 export default async function DashboardPage() {
   const result = await getDashboardSnapshot();
   const dashboard = result.success && result.data ? result.data : null;
@@ -217,6 +225,105 @@ export default async function DashboardPage() {
             )}
           </CardContent>
         </Card>
+      </section>
+
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold">Aprendizaje del Ledger</h2>
+          <p className="text-sm text-muted-foreground">
+            Esta capa usa el historial de interacciones para mostrar que canal trae pedidos de cotizacion, cuanto esfuerzo estas necesitando antes de lograrlos y que patron aparece antes de ganar o perder.
+          </p>
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+          <Card>
+            <CardHeader>
+              <CardTitle>Canales que mas convierten a cotizacion</CardTitle>
+              <CardDescription>
+                Lectura del mes actual. No solo muestra volumen, sino que canal esta logrando que el cliente pida cotizacion.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {dashboard.ledgerLearning.channelPerformance.length === 0 ? (
+                <div className="rounded-xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+                  Aun no hay suficiente actividad externa en el mes actual para leer canales con criterio.
+                </div>
+              ) : (
+                dashboard.ledgerLearning.channelPerformance.map((item) => (
+                  <div key={item.channel} className="grid gap-3 rounded-xl border bg-muted/20 p-4 sm:grid-cols-[1.1fr_0.9fr]">
+                    <div>
+                      <p className="font-semibold">{item.channel}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {item.quoteRequests} pedido(s) de cotizacion sobre {item.interactions} interaccion(es) del canal.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 sm:text-right">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Cotizaciones</p>
+                        <p className="mt-1 text-xl font-bold">{item.quoteRequests}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tasa</p>
+                        <p className="mt-1 text-xl font-bold">{item.quoteRate}%</p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Esfuerzo hasta primera cotizacion</CardTitle>
+                <CardDescription>
+                  Mide cuantos intentos externos necesitas antes del primer pedido de cotizacion del mes.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4 sm:grid-cols-3">
+                <div className="rounded-xl border bg-muted/20 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Empresas cotizadas</p>
+                  <p className="mt-2 text-2xl font-bold">{dashboard.ledgerLearning.quoteEffort.quotedCompanies}</p>
+                </div>
+                <div className="rounded-xl border bg-muted/20 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Promedio intentos</p>
+                  <p className="mt-2 text-2xl font-bold">{formatMetricValue(dashboard.ledgerLearning.quoteEffort.averageAttempts)}</p>
+                </div>
+                <div className="rounded-xl border bg-muted/20 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Mediana intentos</p>
+                  <p className="mt-2 text-2xl font-bold">{formatMetricValue(dashboard.ledgerLearning.quoteEffort.medianAttempts)}</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Patrones antes de cerrar</CardTitle>
+                <CardDescription>
+                  Lectura del mes actual sobre oportunidades cerradas para distinguir disciplina comercial de simple actividad.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
+                  <p className="font-semibold text-emerald-950">Ganadas</p>
+                  <p className="mt-3 text-sm text-emerald-900">Promedio de interacciones ligadas: <span className="font-semibold">{formatMetricValue(dashboard.ledgerLearning.closureSignals.won.averageInteractions)}</span></p>
+                  <p className="mt-1 text-sm text-emerald-900">Con reunion registrada: <span className="font-semibold">{formatMetricValue(dashboard.ledgerLearning.closureSignals.won.meetingRate, "%")}</span></p>
+                  <p className="mt-1 text-sm text-emerald-900">Con referencia de cotizacion: <span className="font-semibold">{formatMetricValue(dashboard.ledgerLearning.closureSignals.won.quoteDisciplineRate, "%")}</span></p>
+                  <p className="mt-1 text-sm text-emerald-900">Con senal de cotizacion o negociacion: <span className="font-semibold">{formatMetricValue(dashboard.ledgerLearning.closureSignals.won.negotiationSignalRate, "%")}</span></p>
+                </div>
+
+                <div className="rounded-xl border border-rose-200 bg-rose-50/70 p-4">
+                  <p className="font-semibold text-rose-950">Perdidas</p>
+                  <p className="mt-3 text-sm text-rose-900">Promedio de interacciones ligadas: <span className="font-semibold">{formatMetricValue(dashboard.ledgerLearning.closureSignals.lost.averageInteractions)}</span></p>
+                  <p className="mt-1 text-sm text-rose-900">Con reunion registrada: <span className="font-semibold">{formatMetricValue(dashboard.ledgerLearning.closureSignals.lost.meetingRate, "%")}</span></p>
+                  <p className="mt-1 text-sm text-rose-900">Con referencia de cotizacion: <span className="font-semibold">{formatMetricValue(dashboard.ledgerLearning.closureSignals.lost.quoteDisciplineRate, "%")}</span></p>
+                  <p className="mt-1 text-sm text-rose-900">Con senal de cotizacion o negociacion: <span className="font-semibold">{formatMetricValue(dashboard.ledgerLearning.closureSignals.lost.negotiationSignalRate, "%")}</span></p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </section>
     </div>
   );
