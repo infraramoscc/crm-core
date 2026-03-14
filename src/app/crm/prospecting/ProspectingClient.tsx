@@ -1,531 +1,596 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useMemo, useState } from "react";
-import { AlertCircle, Building2, Calendar, CalendarClock, CheckCircle2, ChevronDown, ChevronUp, ClipboardList, Clock, History, Linkedin, MessageCircle, Pencil, PhoneCall, Plus, Target, Trash2, TrendingUp, UserRoundSearch, X } from "lucide-react";
-import type { ProspectingCompanyItem, ProspectingCompanyView } from "@/lib/crm-list-types";
-import { matchesSearch } from "@/lib/search";
+import { Fragment, useEffect, useState } from "react";
+import {
+  AlertCircle,
+  Building2,
+  Calendar,
+  CalendarClock,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  ClipboardList,
+  Clock,
+  History,
+  Linkedin,
+  Mail,
+  Pencil,
+  PhoneCall,
+  Plus,
+  Target,
+  Trash2,
+  TrendingUp,
+  UserRoundSearch,
+  X,
+} from "lucide-react";
+import type { ProspectingCompanyItem, ProspectingCompanyView, ProspectingContactItem, ProspectingInteractionItem } from "@/lib/crm-list-types";
 import { deleteContactInfo } from "@/app/actions/crm/contact-actions";
-import { useScopedSearch } from "@/components/layout/SearchProvider";
-import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LogInteractionModal } from "@/components/crm/LogInteractionModal";
-import { CreateTaskModal } from "@/components/crm/CreateTaskModal";
+import { CreateTaskModal, type CreateTaskSuccessPayload } from "@/components/crm/CreateTaskModal";
 import { DisqualifyModal } from "@/components/crm/DisqualifyModal";
+import { LogInteractionModal, type LogInteractionSuccessPayload } from "@/components/crm/LogInteractionModal";
+import { useScopedSearch } from "@/components/layout/SearchProvider";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { matchesSearch } from "@/lib/search";
 
 const ITEMS_PER_PAGE = 10;
 
 const CONTACT_STATUS_STYLES = {
-    UNVALIDATED: "bg-slate-100 text-slate-700 border-slate-200",
-    VALIDATED_NO_RESPONSE: "bg-amber-100 text-amber-800 border-amber-200",
-    VALIDATED_RESPONDS: "bg-blue-100 text-blue-800 border-blue-200",
-    INTERESTED: "bg-emerald-100 text-emerald-800 border-emerald-200",
-    NOT_DECISION_MAKER: "bg-orange-100 text-orange-800 border-orange-200",
-    DECISION_MAKER: "bg-violet-100 text-violet-800 border-violet-200",
-    REPLACE: "bg-rose-100 text-rose-700 border-rose-200",
-    DISCARDED: "bg-zinc-100 text-zinc-600 border-zinc-200",
+  UNVALIDATED: "bg-slate-100 text-slate-700 border-slate-200",
+  VALIDATED_NO_RESPONSE: "bg-amber-100 text-amber-800 border-amber-200",
+  VALIDATED_RESPONDS: "bg-blue-100 text-blue-800 border-blue-200",
+  INTERESTED: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  NOT_DECISION_MAKER: "bg-orange-100 text-orange-800 border-orange-200",
+  DECISION_MAKER: "bg-violet-100 text-violet-800 border-violet-200",
+  REPLACE: "bg-rose-100 text-rose-700 border-rose-200",
+  DISCARDED: "bg-zinc-100 text-zinc-600 border-zinc-200",
 } as const;
 
 const CONTACT_STATUS_LABELS = {
-    UNVALIDATED: "Sin validar",
-    VALIDATED_NO_RESPONSE: "Validado sin respuesta",
-    VALIDATED_RESPONDS: "Responde",
-    INTERESTED: "Interesado",
-    NOT_DECISION_MAKER: "No decide",
-    DECISION_MAKER: "Decisor",
-    REPLACE: "Reemplazar",
-    DISCARDED: "Descartado",
+  UNVALIDATED: "Sin validar",
+  VALIDATED_NO_RESPONSE: "Validado sin respuesta",
+  VALIDATED_RESPONDS: "Responde",
+  INTERESTED: "Interesado",
+  NOT_DECISION_MAKER: "No decide",
+  DECISION_MAKER: "Decisor",
+  REPLACE: "Reemplazar",
+  DISCARDED: "Descartado",
 } as const;
 
 const BUYING_ROLE_LABELS = {
-    UNKNOWN: "Rol sin definir",
-    OPERATIONS: "Operaciones",
-    USER: "Usuario",
-    INFLUENCER: "Influenciador",
-    DECISION_MAKER: "Decisor",
-    BLOCKER: "Bloqueador",
+  UNKNOWN: "Rol sin definir",
+  OPERATIONS: "Operaciones",
+  USER: "Usuario",
+  INFLUENCER: "Influenciador",
+  DECISION_MAKER: "Decisor",
+  BLOCKER: "Bloqueador",
 } as const;
 
 const OUTCOME_LABELS = {
-    NO_RESPONSE: "No respondio",
-    INVALID_PHONE: "Numero invalido",
-    BOUNCED_EMAIL: "Correo rebotado",
-    VERIFIED_CONTACT: "Contacto validado",
-    REFERRED_TO_OTHER: "Derivo a otra persona",
-    CALLBACK_REQUESTED: "Pidio retomar",
-    SHARED_OPERATION: "Compartio operacion",
-    REQUESTED_QUOTE: "Pidio cotizacion",
-    NO_INTEREST: "Sin interes",
-    HAS_CURRENT_VENDOR: "Ya trabaja con otro operador",
-    OTHER: "Otro",
+  NO_RESPONSE: "No respondio",
+  INVALID_PHONE: "Numero invalido",
+  BOUNCED_EMAIL: "Correo rebotado",
+  VERIFIED_CONTACT: "Contacto validado",
+  REFERRED_TO_OTHER: "Derivo a otra persona",
+  CALLBACK_REQUESTED: "Pidio retomar",
+  SHARED_OPERATION: "Compartio operacion",
+  REQUESTED_QUOTE: "Pidio cotizacion",
+  NO_INTEREST: "Sin interes",
+  HAS_CURRENT_VENDOR: "Ya trabaja con otro operador",
+  OTHER: "Otro",
 } as const;
 
-function interactionLabel(type: string) {
-    switch (type) {
-        case "CALL_MADE": return "Llamada";
-        case "WHATSAPP_SENT": return "WhatsApp Enviado";
-        case "EMAIL_SENT": return "Correo Enviado";
-        case "EMAIL_OPENED": return "Correo Abierto";
-        case "MEETING": return "Reunion";
-        default: return type;
-    }
+type SessionState = { currentContactId: string | null; completedContactIds: string[] };
+
+function getOutcomeTone(outcome: ProspectingInteractionItem["outcome"]) {
+  switch (outcome) {
+    case "REQUESTED_QUOTE":
+      return "border-emerald-200 bg-emerald-50/80";
+    case "SHARED_OPERATION":
+      return "border-sky-200 bg-sky-50/80";
+    case "CALLBACK_REQUESTED":
+      return "border-amber-200 bg-amber-50/80";
+    case "NO_RESPONSE":
+    case "INVALID_PHONE":
+    case "BOUNCED_EMAIL":
+    case "NO_INTEREST":
+      return "border-rose-200 bg-rose-50/70";
+    default:
+      return "border-border bg-muted/20";
+  }
 }
 
-function interactionMarker(type: string) {
-    switch (type) {
-        case "CALL_MADE": return "L";
-        case "WHATSAPP_SENT": return "W";
-        case "EMAIL_SENT": return "E";
-        case "MEETING": return "R";
-        default: return "N";
-    }
+function getOutcomeAccent(outcome: ProspectingInteractionItem["outcome"]) {
+  switch (outcome) {
+    case "REQUESTED_QUOTE":
+      return "bg-emerald-500";
+    case "SHARED_OPERATION":
+      return "bg-sky-500";
+    case "CALLBACK_REQUESTED":
+      return "bg-amber-500";
+    case "NO_RESPONSE":
+    case "INVALID_PHONE":
+    case "BOUNCED_EMAIL":
+    case "NO_INTEREST":
+      return "bg-rose-500";
+    default:
+      return "bg-slate-300";
+  }
 }
 
-function getCompanyReadiness(company: ProspectingCompanyItem, interactions: ProspectingCompanyView["allInteractions"]) {
-    const validatedContacts = company.contacts.filter((contact) =>
-        ["VALIDATED_RESPONDS", "INTERESTED", "DECISION_MAKER"].includes(contact.commercialStatus)
-    );
-    const hasDecisionMaker = company.contacts.some((contact) =>
-        contact.commercialStatus === "DECISION_MAKER" || contact.buyingRole === "DECISION_MAKER"
-    );
-    const hasOperationSignal = interactions.some((interaction) =>
-        interaction.outcome === "SHARED_OPERATION" || interaction.outcome === "REQUESTED_QUOTE"
-    );
+function toDate(value: Date | string | null | undefined) {
+  if (!value) return null;
+  return value instanceof Date ? value : new Date(value);
+}
 
-    if (validatedContacts.length === 0) {
-        return {
-            label: "Validar contacto",
-            description: "Aun falta confirmar un contacto util.",
-            ready: false,
-            tone: "bg-slate-100 text-slate-700 border-slate-200",
-        };
-    }
+function formatDate(value: Date | string | null | undefined, options?: Intl.DateTimeFormatOptions) {
+  const parsed = toDate(value);
+  return parsed ? parsed.toLocaleDateString("es-PE", options) : null;
+}
 
-    if (!hasDecisionMaker) {
-        return {
-            label: "Falta decisor",
-            description: "La cuenta responde, pero aun no aparece quien decide.",
-            ready: false,
-            tone: "bg-amber-100 text-amber-800 border-amber-200",
-        };
-    }
+function formatDateTime(value: Date | string | null | undefined) {
+  const parsed = toDate(value);
+  return parsed ? parsed.toLocaleString("es-PE", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : null;
+}
 
-    if (!hasOperationSignal) {
-        return {
-            label: "Descubrir operacion",
-            description: "Ya hay decisor, pero aun falta bajar la necesidad concreta.",
-            ready: false,
-            tone: "bg-blue-100 text-blue-800 border-blue-200",
-        };
-    }
+function hasReachableChannel(contact: ProspectingContactItem) {
+  return contact.phones.length > 0 || contact.emails.length > 0 || Boolean(contact.linkedin);
+}
 
-    return {
-        label: "Lista para oportunidad",
-        description: "Ya hay contacto util y senal clara de negocio.",
-        ready: true,
-        tone: "bg-emerald-100 text-emerald-800 border-emerald-200",
-    };
+function isActionable(contact: ProspectingContactItem) {
+  return hasReachableChannel(contact) && contact.commercialStatus !== "DISCARDED" && contact.commercialStatus !== "REPLACE";
+}
+
+function sortInteractions(items: ProspectingInteractionItem[]) {
+  return [...items].sort((a, b) => (toDate(b.interactedAt)?.getTime() ?? 0) - (toDate(a.interactedAt)?.getTime() ?? 0));
+}
+
+function getView(company: ProspectingCompanyItem, today: string): ProspectingCompanyView {
+  const allInteractions = sortInteractions(company.interactions);
+  const lastInteraction = allInteractions[0] ?? null;
+  const nextTask = allInteractions
+    .filter((item) => item.nextFollowUpDate && !item.isFollowUpCompleted)
+    .sort((a, b) => (toDate(a.nextFollowUpDate)?.getTime() ?? 0) - (toDate(b.nextFollowUpDate)?.getTime() ?? 0))[0] ?? null;
+  const nextTaskFormattedDate = nextTask?.nextFollowUpDate ? toDate(nextTask.nextFollowUpDate)?.toISOString().split("T")[0] ?? null : null;
+
+  let category: ProspectingCompanyView["category"] = "inactive";
+  if (!lastInteraction && !nextTask) category = "new";
+  else if (nextTaskFormattedDate && nextTaskFormattedDate <= today) category = "today";
+  else if (nextTaskFormattedDate && nextTaskFormattedDate > today) category = "future";
+
+  return { company, lastInteraction, nextTask, allInteractions, nextTaskFormattedDate, category };
+}
+
+function getSession(company: ProspectingCompanyItem, state?: SessionState) {
+  const actionableContacts = company.contacts.filter(isActionable);
+  const completedIds = new Set(state?.completedContactIds ?? []);
+  const completedContacts = actionableContacts.filter((contact) => completedIds.has(contact.id));
+  const pendingContacts = actionableContacts.filter((contact) => !completedIds.has(contact.id));
+  const currentContact = pendingContacts.find((contact) => contact.id === state?.currentContactId) ?? pendingContacts[0] ?? null;
+  return {
+    actionableContacts,
+    completedContacts,
+    pendingContacts,
+    currentContact,
+    exhausted: pendingContacts.length === 0,
+    progressValue: actionableContacts.length === 0 ? 0 : Math.round((completedContacts.length / actionableContacts.length) * 100),
+  };
+}
+
+function getReadiness(company: ProspectingCompanyItem, interactions: ProspectingInteractionItem[]) {
+  const hasUsefulContact = company.contacts.some((contact) => ["VALIDATED_RESPONDS", "INTERESTED", "DECISION_MAKER"].includes(contact.commercialStatus));
+  const hasDecisionMaker = company.contacts.some((contact) => contact.buyingRole === "DECISION_MAKER" || contact.commercialStatus === "DECISION_MAKER");
+  const hasOperationSignal = interactions.some((interaction) => interaction.outcome === "SHARED_OPERATION" || interaction.outcome === "REQUESTED_QUOTE");
+  if (!hasUsefulContact) return { label: "Validar contacto", tone: "bg-slate-100 text-slate-700 border-slate-200", ready: false };
+  if (!hasDecisionMaker) return { label: "Falta decisor", tone: "bg-amber-100 text-amber-800 border-amber-200", ready: false };
+  if (!hasOperationSignal) return { label: "Descubrir operacion", tone: "bg-blue-100 text-blue-800 border-blue-200", ready: false };
+  return { label: "Lista para oportunidad", tone: "bg-emerald-100 text-emerald-800 border-emerald-200", ready: true };
 }
 
 function getBestOpportunityContact(company: ProspectingCompanyItem) {
-    return company.contacts.find((contact) =>
-        contact.commercialStatus === "DECISION_MAKER" || contact.buyingRole === "DECISION_MAKER"
-    ) || company.contacts.find((contact) =>
-        contact.commercialStatus === "INTERESTED" || contact.commercialStatus === "VALIDATED_RESPONDS"
-    ) || company.contacts[0] || null;
-}
-
-function getCoverageSummary(company: ProspectingCompanyItem) {
-    const validated = company.contacts.filter((contact) =>
-        ["VALIDATED_RESPONDS", "INTERESTED", "DECISION_MAKER"].includes(contact.commercialStatus)
-    ).length;
-    const decisionMakers = company.contacts.filter((contact) =>
-        contact.buyingRole === "DECISION_MAKER" || contact.commercialStatus === "DECISION_MAKER"
-    ).length;
-    const influencers = company.contacts.filter((contact) => contact.buyingRole === "INFLUENCER").length;
-    const operations = company.contacts.filter((contact) => contact.buyingRole === "OPERATIONS").length;
-
-    return {
-        validated,
-        decisionMakers,
-        influencers,
-        operations,
-    };
-}
-
-function getDiscoveryPlaybook(company: ProspectingCompanyItem, interactions: ProspectingCompanyView["allInteractions"]) {
-    const hasQuoteSignal = interactions.some((interaction) => interaction.outcome === "REQUESTED_QUOTE");
-    const hasOperationSignal = interactions.some((interaction) => interaction.outcome === "SHARED_OPERATION");
-
-    let focus = "Descubrir la operacion y quien decide";
-    let questions = [
-        "Que embarques o despachos mueve hoy y con que frecuencia?",
-        "Con quien trabaja actualmente y que le incomoda de ese servicio?",
-        "Quien revisa propuesta y quien toma la decision final?",
-    ];
-
-    if (company.importVolume === "HIGH" || (company.annualDams ?? 0) > 30) {
-        focus = "Abrir cuenta recurrente y no solo negocio spot";
-        questions = [
-            "Cuantos embarques o DAMs mueve al mes y en que rutas principales?",
-            "Que KPI le duele mas hoy: costo, tiempos, libres o observaciones?",
-            "Si mejoramos esa parte, que tan viable es probar con una operacion piloto?",
-        ];
-    } else if (company.valueDriver === "SPEED") {
-        focus = "Vender velocidad, control y respuesta operativa";
-        questions = [
-            "En que parte pierde mas tiempo hoy: cotizacion, embarque, arribo o levante?",
-            "Que urgencias le han costado sobrecosto recientemente?",
-            "Que tendria que pasar para que nos pruebe en una operacion sensible?",
-        ];
-    } else if (company.valueDriver === "PRICE") {
-        focus = "Bajar a comparativo economico concreto sin regalar margen a ciegas";
-        questions = [
-            "Que concepto siente hoy mas inflado en su operacion?",
-            "Compara solo tarifa o tambien dias libres, seguimiento y respuesta?",
-            "Si le mostramos ahorro real en una ruta puntual, quien aprueba la prueba?",
-        ];
-    }
-
-    const convertSignal = hasQuoteSignal
-        ? "Ya hay senal de cotizacion. Empuja cierre o abre oportunidad formal."
-        : hasOperationSignal
-            ? "Ya hay operacion concreta. Falta amarrar decisor o siguiente paso."
-            : "Aun falta aterrizar una necesidad concreta antes de convertir.";
-
-    return { focus, questions, convertSignal };
+  return company.contacts.find((contact) => contact.buyingRole === "DECISION_MAKER" || contact.commercialStatus === "DECISION_MAKER")
+    || company.contacts.find((contact) => contact.commercialStatus === "INTERESTED" || contact.commercialStatus === "VALIDATED_RESPONDS")
+    || company.contacts[0]
+    || null;
 }
 
 export default function ProspectingClient({ initialCompanies }: { initialCompanies: ProspectingCompanyItem[] }) {
-    const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
-    const [activeTab, setActiveTab] = useState("today");
-    const [currentPage, setCurrentPage] = useState(1);
-    const [postponedIds, setPostponedIds] = useState<Set<string>>(new Set());
-    const todayDate = new Date().toISOString().split("T")[0];
-    const { query: searchQuery } = useScopedSearch();
+  const [companies, setCompanies] = useState(initialCompanies);
+  const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
+  const [contextExpandedCompanies, setContextExpandedCompanies] = useState<Set<string>>(new Set());
+  const [sessionByCompany, setSessionByCompany] = useState<Record<string, SessionState>>({});
+  const [postponedIds, setPostponedIds] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState("today");
+  const [currentPage, setCurrentPage] = useState(1);
+  const todayDate = new Date().toISOString().split("T")[0];
+  const { query: searchQuery } = useScopedSearch();
 
-    const companiesWithData = useMemo<ProspectingCompanyView[]>(() => initialCompanies
-        .filter((company) => company.contacts.some((contact) => contact.emails.length > 0 || contact.phones.length > 0) && company.opportunities.length === 0)
-        .map((company) => {
-            const allInteractions = [...company.interactions].sort((a, b) => new Date(b.interactedAt).getTime() - new Date(a.interactedAt).getTime());
-            const lastInteraction = allInteractions[0] ?? null;
-            const nextTask = allInteractions
-                .filter((interaction) => interaction.nextFollowUpDate && !interaction.isFollowUpCompleted)
-                .sort((a, b) => new Date(a.nextFollowUpDate as Date).getTime() - new Date(b.nextFollowUpDate as Date).getTime())[0] ?? null;
-            const nextTaskFormattedDate = nextTask?.nextFollowUpDate ? new Date(nextTask.nextFollowUpDate).toISOString().split("T")[0] : null;
+  useEffect(() => setCompanies(initialCompanies), [initialCompanies]);
 
-            let category: ProspectingCompanyView["category"] = "inactive";
-            if (!lastInteraction && !nextTask) category = "new";
-            else if (nextTaskFormattedDate && nextTaskFormattedDate <= todayDate) category = "today";
-            else if (nextTaskFormattedDate && nextTaskFormattedDate > todayDate) category = "future";
+  const views = companies
+    .filter((company) => company.contacts.some(hasReachableChannel) && company.opportunities.length === 0)
+    .map((company) => getView(company, todayDate));
 
-            return { company, lastInteraction, nextTask, allInteractions, nextTaskFormattedDate, category };
-        }), [initialCompanies, todayDate]);
+  const visibleCompanies = views.filter((item) =>
+    !postponedIds.has(item.company.id) &&
+    matchesSearch(
+      searchQuery,
+      item.company.businessName,
+      item.company.documentNumber,
+      item.company.contacts.map((contact) => `${contact.firstName} ${contact.lastName} ${contact.emails.join(" ")} ${contact.phones.join(" ")} ${CONTACT_STATUS_LABELS[contact.commercialStatus]} ${BUYING_ROLE_LABELS[contact.buyingRole]}`),
+      item.allInteractions.map((interaction) => `${interaction.notes || ""} ${interaction.outcome ? OUTCOME_LABELS[interaction.outcome] : ""}`)
+    )
+  );
 
-    const visibleCompanies = companiesWithData.filter((item) =>
-        !postponedIds.has(item.company.id) &&
-        matchesSearch(
-            searchQuery,
-            item.company.businessName,
-            item.company.documentNumber,
-            item.company.contacts.map((contact) => `${contact.firstName} ${contact.lastName} ${contact.emails.join(" ")} ${contact.phones.join(" ")} ${CONTACT_STATUS_LABELS[contact.commercialStatus]} ${BUYING_ROLE_LABELS[contact.buyingRole]}`),
-            item.allInteractions.map((interaction) => `${interaction.notes || ""} ${interaction.outcome ? OUTCOME_LABELS[interaction.outcome] : ""}`)
-        )
-    );
-    const grouped = {
-        today: visibleCompanies.filter((item) => item.category === "today"),
-        new: visibleCompanies.filter((item) => item.category === "new"),
-        future: visibleCompanies.filter((item) => item.category === "future"),
-        inactive: visibleCompanies.filter((item) => item.category === "inactive"),
+  const grouped = {
+    today: visibleCompanies.filter((item) => {
+      const session = getSession(item.company, sessionByCompany[item.company.id]);
+      return item.category === "today" && !session.exhausted;
+    }),
+    queue: visibleCompanies.filter((item) => {
+      const session = getSession(item.company, sessionByCompany[item.company.id]);
+      return !session.exhausted && (item.category === "new" || item.category === "future");
+    }),
+    exhausted: visibleCompanies.filter((item) => {
+      const session = getSession(item.company, sessionByCompany[item.company.id]);
+      return session.exhausted;
+    }),
+    noNextStep: visibleCompanies.filter((item) => {
+      const session = getSession(item.company, sessionByCompany[item.company.id]);
+      return !session.exhausted && item.category === "inactive";
+    }),
+  };
+
+  const updateCompany = (companyId: string, updater: (company: ProspectingCompanyItem) => ProspectingCompanyItem) => {
+    setCompanies((current) => current.map((company) => company.id === companyId ? updater(company) : company));
+  };
+
+  const toggleExpand = (companyId: string) => {
+    setExpandedCompanies((current) => {
+      const next = new Set(current);
+      if (next.has(companyId)) next.delete(companyId);
+      else next.add(companyId);
+      return next;
+    });
+  };
+
+  const openSession = (companyId: string, contactId?: string) => {
+    const company = companies.find((item) => item.id === companyId);
+    if (!company) return;
+    const session = getSession(company, sessionByCompany[companyId]);
+    setExpandedCompanies((current) => new Set(current).add(companyId));
+    setSessionByCompany((current) => ({
+      ...current,
+      [companyId]: {
+        currentContactId: contactId ?? current[companyId]?.currentContactId ?? session.currentContact?.id ?? null,
+        completedContactIds: current[companyId]?.completedContactIds ?? [],
+      },
+    }));
+  };
+
+  const finishCurrentContact = (companyId: string) => {
+    const company = companies.find((item) => item.id === companyId);
+    if (!company) return;
+    const session = getSession(company, sessionByCompany[companyId]);
+    if (!session.currentContact) return;
+
+    const completed = [...(sessionByCompany[companyId]?.completedContactIds ?? [])];
+    if (!completed.includes(session.currentContact.id)) completed.push(session.currentContact.id);
+    const nextPending = session.actionableContacts.filter((contact) => !completed.includes(contact.id));
+
+    setSessionByCompany((current) => ({
+      ...current,
+      [companyId]: {
+        currentContactId: nextPending[0]?.id ?? null,
+        completedContactIds: completed,
+      },
+    }));
+  };
+
+  const handleInteractionSuccess = (companyId: string, payload: LogInteractionSuccessPayload) => {
+    updateCompany(companyId, (company) => ({
+      ...company,
+      leadScore: company.leadScore + Math.max(payload.interaction.scoreImpact, 0),
+      contacts: company.contacts.map((contact) =>
+        payload.contactUpdate && contact.id === payload.contactUpdate.id
+          ? { ...contact, commercialStatus: payload.contactUpdate.commercialStatus, buyingRole: payload.contactUpdate.buyingRole, lastValidatedAt: payload.contactUpdate.lastValidatedAt }
+          : contact
+      ),
+      interactions: sortInteractions([payload.interaction, ...company.interactions]),
+    }));
+  };
+
+  const handleTaskSuccess = (companyId: string, payload: CreateTaskSuccessPayload) => {
+    updateCompany(companyId, (company) => ({
+      ...company,
+      interactions: sortInteractions([payload.interaction, ...company.interactions]),
+    }));
+  };
+
+  const removeContactChannel = async (companyId: string, contactId: string, type: "email" | "phone", value: string) => {
+    const result = await deleteContactInfo(contactId, type, value);
+    if (!result.success) {
+      alert("No se pudo actualizar el contacto.");
+      return;
+    }
+
+    updateCompany(companyId, (company) => ({
+      ...company,
+      contacts: company.contacts.map((contact) =>
+        contact.id === contactId
+          ? {
+              ...contact,
+              emails: type === "email" ? contact.emails.filter((item) => item !== value) : contact.emails,
+              phones: type === "phone" ? contact.phones.filter((item) => item !== value) : contact.phones,
+            }
+          : contact
+      ),
+    }));
+  };
+
+  const renderExpanded = (item: ProspectingCompanyView) => {
+    const { company, allInteractions, nextTask } = item;
+    const session = getSession(company, sessionByCompany[company.id]);
+    const readiness = getReadiness(company, allInteractions);
+    const currentContact = session.currentContact;
+    const showContext = contextExpandedCompanies.has(company.id);
+    const coverage = {
+      validated: company.contacts.filter((contact) => ["VALIDATED_RESPONDS", "INTERESTED", "DECISION_MAKER"].includes(contact.commercialStatus)).length,
+      decisionMakers: company.contacts.filter((contact) => contact.buyingRole === "DECISION_MAKER" || contact.commercialStatus === "DECISION_MAKER").length,
+      influencers: company.contacts.filter((contact) => contact.buyingRole === "INFLUENCER").length,
+      operations: company.contacts.filter((contact) => contact.buyingRole === "OPERATIONS").length,
     };
-
-    const toggleExpand = (companyId: string) => {
-        setExpandedCompanies((prev) => {
-            const next = new Set(prev);
-            if (next.has(companyId)) next.delete(companyId);
-            else next.add(companyId);
-            return next;
-        });
+    const playbook = {
+      focus: company.valueDriver === "PRICE" ? "Comparativo economico concreto" : "Descubrir operacion y quien decide",
+      questions: company.valueDriver === "PRICE"
+        ? ["Que concepto siente mas inflado en su operacion?", "Compara solo tarifa o tambien seguimiento y respuesta?", "Si le mostramos ahorro real, quien aprueba la prueba?"]
+        : ["Que embarques o despachos mueve hoy y con que frecuencia?", "Con quien trabaja actualmente y que le incomoda?", "Quien revisa la propuesta y quien decide?"],
     };
-
-    const renderTable = (data: ProspectingCompanyView[], emptyMessage: string) => {
-        const totalPages = Math.ceil(data.length / ITEMS_PER_PAGE);
-        const paginatedData = data.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
-
-        return (
-            <div className="flex flex-col gap-4">
-                <div className="rounded-md border bg-card">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Prospecto a Atacar</TableHead>
-                                <TableHead>Contactos Clave</TableHead>
-                                <TableHead>Seguimiento</TableHead>
-                                <TableHead>Termometro (Score)</TableHead>
-                                <TableHead className="text-right">Accion Requerida</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {paginatedData.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">{emptyMessage}</TableCell>
-                                </TableRow>
-                            ) : paginatedData.map(({ company, lastInteraction, nextTask, allInteractions, nextTaskFormattedDate }) => {
-                                const contacts = company.contacts.filter((contact) => contact.emails.length > 0 || contact.phones.length > 0);
-                                const readiness = getCompanyReadiness(company, allInteractions);
-                                const bestOpportunityContact = getBestOpportunityContact(company);
-                                const isExpanded = expandedCompanies.has(company.id);
-                                const isOverdue = Boolean(nextTaskFormattedDate && nextTaskFormattedDate < todayDate);
-                                const isToday = Boolean(nextTaskFormattedDate && nextTaskFormattedDate === todayDate);
-
-                                return (
-                                    <Fragment key={company.id}>
-                                        <TableRow className={isExpanded ? "border-b-0" : ""}>
-                                            <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                    <Building2 className="h-4 w-4 text-muted-foreground" />
-                                                    <div>
-                                                        <p className="font-medium leading-none">{company.businessName}</p>
-                                                        <p className="mt-1 text-[10px] text-muted-foreground">RUC: {company.documentNumber}</p>
-                                                        <div className="mt-2 flex gap-2">
-                                                            {company.importVolume === "HIGH" && <Badge variant="secondary" className="bg-emerald-100 text-[10px] text-emerald-800">Volumen Alto</Badge>}
-                                                            {company.valueDriver === "PRICE" && <Badge variant="secondary" className="bg-blue-100 text-[10px] text-blue-800">Busca Precio</Badge>}
-                                                            <Badge variant="outline" className={readiness.tone}>
-                                                                {readiness.label}
-                                                            </Badge>
-                                                        </div>
-                                                        <p className="mt-2 text-[10px] text-muted-foreground">
-                                                            {readiness.description}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex flex-col gap-3">
-                                                    {contacts.slice(0, 3).map((contact) => {
-                                                        const contactedToday = allInteractions.some((interaction) => interaction.contactId === contact.id && interaction.interactedAt.toISOString().split("T")[0] === todayDate);
-                                                        return (
-                                                            <div key={contact.id} className={`border-b pb-2 text-sm last:border-0 last:pb-0 ${contactedToday ? "rounded border-emerald-100 bg-emerald-50/50 p-1 -ml-1" : ""}`}>
-                                                                <div className="group mb-1 flex items-center justify-between font-semibold">
-                                                                    <div className="flex items-center gap-1">
-                                                                        {contact.firstName} {contact.lastName}
-                                                                        <Badge variant="outline" className={`ml-1 h-4 text-[9px] ${CONTACT_STATUS_STYLES[contact.commercialStatus]}`}>
-                                                                            {CONTACT_STATUS_LABELS[contact.commercialStatus]}
-                                                                        </Badge>
-                                                                        <Badge variant="outline" className="h-4 text-[9px]">
-                                                                            {BUYING_ROLE_LABELS[contact.buyingRole]}
-                                                                        </Badge>
-                                                                        {contact.linkedin && (
-                                                                            <a href={contact.linkedin.startsWith("http") ? contact.linkedin : `https://${contact.linkedin}`} target="_blank" rel="noopener noreferrer" className="ml-1 text-blue-600 hover:text-blue-800" title="Perfil de LinkedIn">
-                                                                                <Linkedin className="inline h-3 w-3" />
-                                                                            </a>
-                                                                        )}
-                                                                        {contactedToday && <CheckCircle2 className="ml-1 h-3 w-3 text-emerald-500" />}
-                                                                    </div>
-                                                                    <div className="flex items-center gap-2 opacity-100 transition-opacity md:opacity-0 group-hover:opacity-100">
-                                                                        <LogInteractionModal companyId={company.id} contacts={contacts} defaultContactId={contact.id} lockedContact onSuccess={() => {}} triggerButton={<Button variant="ghost" size="icon" className="h-6 w-6 text-primary hover:bg-primary/10 hover:text-primary" title="Registrar Accion"><PhoneCall className="h-3 w-3" /></Button>} />
-                                                                        <CreateTaskModal companyId={company.id} contacts={contacts} defaultContactId={contact.id} onSuccess={() => {}} triggerButton={<Button variant="ghost" size="icon" className="h-6 w-6 text-amber-600 hover:bg-amber-100 hover:text-amber-700" title="Agendar Tarea"><CalendarClock className="h-3 w-3" /></Button>} />
-                                                                        <Link href={`/contacts/${contact.id}`} className="text-muted-foreground hover:text-blue-600" title="Editar Contacto"><Pencil className="h-3 w-3" /></Link>
-                                                                    </div>
-                                                                </div>
-                                                                {contact.lastValidatedAt && (
-                                                                    <p className="pl-4 text-[10px] text-muted-foreground">
-                                                                        Validado: {new Date(contact.lastValidatedAt).toLocaleDateString("es-PE")}
-                                                                    </p>
-                                                                )}
-                                                                {contact.phones.map((phone, index) => (
-                                                                    <div key={`${contact.id}-phone-${index}`} className="group mb-1 flex items-center justify-between pl-4 text-xs text-muted-foreground">
-                                                                        <div className="flex items-center gap-2"><PhoneCall className="h-3 w-3" /><span>{phone}</span></div>
-                                                                        <div className="flex items-center gap-1 opacity-100 transition-opacity md:opacity-0 group-hover:opacity-100">
-                                                                            <a href={`https://wa.me/${phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`Hola ${contact.firstName}, soy Gualbert, analizando las importaciones de ${company.businessName}...`)}`} target="_blank" rel="noopener noreferrer" className="text-emerald-500 hover:text-emerald-600" title="Hablar por WhatsApp"><MessageCircle className="h-3 w-3" /></a>
-                                                                            <button onClick={() => deleteContactInfo(contact.id, "phone", phone)} className="text-red-400 hover:text-red-600" title="Descartar numero"><X className="h-3 w-3" /></button>
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
-                                                                {contact.emails.map((email, index) => (
-                                                                    <div key={`${contact.id}-email-${index}`} className="group mb-1 flex items-center justify-between pl-4 text-xs text-muted-foreground">
-                                                                        <span>{email}</span>
-                                                                        <button onClick={() => deleteContactInfo(contact.id, "email", email)} className="text-red-400 opacity-100 transition-opacity hover:text-red-600 md:opacity-0 group-hover:opacity-100" title="Descartar correo que reboto"><X className="h-3 w-3" /></button>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        );
-                                                    })}
-                                                    {contacts.length > 3 && <span className="text-xs italic text-muted-foreground">+{contacts.length - 3} contactos ocultos</span>}
-                                                    <Link href={`/contacts/new?companyId=${company.id}`} className="mt-1 flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:text-blue-800"><Plus className="h-3 w-3" /> Anadir Contacto</Link>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex flex-col gap-2">
-                                                    {nextTask ? (
-                                                        <div className="flex flex-col gap-1">
-                                                            <span className={`flex items-center text-xs font-bold ${isOverdue ? "text-red-600" : isToday ? "text-amber-600" : "text-blue-600"}`}>
-                                                                {isOverdue && <AlertCircle className="mr-1 h-3 w-3" />}
-                                                                {isToday && <Clock className="mr-1 h-3 w-3" />}
-                                                                {!isOverdue && !isToday && <Calendar className="mr-1 h-3 w-3" />}
-                                                                {isOverdue ? `Atrasado: ${nextTaskFormattedDate}` : isToday ? "Toca Hoy" : `Proximo: ${nextTaskFormattedDate}`}
-                                                            </span>
-                                                            <span className="max-w-[150px] truncate text-[10px] text-muted-foreground">Ult. nota: {lastInteraction?.notes || "Ninguna"}</span>
-                                                        </div>
-                                                    ) : lastInteraction ? (
-                                                        <span className="flex items-center text-xs text-muted-foreground">Ult: {new Date(lastInteraction.interactedAt).toLocaleDateString()}</span>
-                                                    ) : (
-                                                        <Badge variant="outline" className="border-dashed text-muted-foreground">Sin Contactar</Badge>
-                                                    )}
-                                                    {allInteractions.length > 0 && (
-                                                        <button onClick={() => toggleExpand(company.id)} className="mt-1 flex items-center gap-1 text-[11px] text-primary hover:underline">
-                                                            <History className="h-3 w-3" />{isExpanded ? "Ocultar" : "Ver"} Historial ({allInteractions.length}){isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-sm font-bold">{company.leadScore} pts</span>
-                                                    <div className="h-2 w-16 overflow-hidden rounded-full bg-muted"><div className={`h-full ${company.leadScore > 50 ? "bg-emerald-500" : "bg-amber-400"}`} style={{ width: `${Math.min(company.leadScore, 100)}%` }} /></div>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="min-h-full text-right">
-                                                <div className="flex flex-col items-end justify-center gap-2">
-                                                    <CreateTaskModal companyId={company.id} contacts={contacts} defaultContactId="none" isSimplePostpone onSuccess={() => setPostponedIds((prev) => new Set(prev).add(company.id))} triggerButton={<Button size="sm" variant="outline" className="h-8 w-[140px] border-dashed border-primary/50 text-primary"><Calendar className="mr-1 h-3 w-3" /> Posponer Cuenta</Button>} />
-                                                    <Button variant={readiness.ready ? "default" : "ghost"} size="sm" className={readiness.ready ? "h-8 bg-emerald-600 hover:bg-emerald-700" : "h-7 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"} asChild><Link href={`/crm/opportunities/new?companyId=${company.id}${bestOpportunityContact ? `&contactId=${bestOpportunityContact.id}` : ""}`}>{readiness.ready ? <><TrendingUp className="mr-1 h-3 w-3" /> Abrir Oportunidad</> : <><TrendingUp className="mr-1 h-3 w-3" /> Aun verde</>}</Link></Button>
-                                                    <DisqualifyModal companyId={company.id} companyName={company.businessName} onSuccess={() => setPostponedIds((prev) => new Set(prev).add(company.id))} triggerButton={<Button variant="ghost" size="sm" className="h-7 text-red-500 hover:bg-red-50 hover:text-red-700"><Trash2 className="mr-1 h-3 w-3" /> Descartar</Button>} />
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-
-                                        {isExpanded && allInteractions.length > 0 && (
-                                            <TableRow key={`${company.id}-timeline`}>
-                                                <TableCell colSpan={5} className="bg-muted/30 p-0">
-                                                    <div className="px-6 py-4">
-                                                        <div className="mb-4 grid gap-4 lg:grid-cols-2">
-                                                            <div className="rounded-lg border bg-background p-4">
-                                                                <h4 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                                                                    <UserRoundSearch className="h-3.5 w-3.5" /> Cobertura de Cuenta
-                                                                </h4>
-                                                                <div className="grid grid-cols-2 gap-3 text-xs">
-                                                                    <div className="rounded-md bg-muted/40 p-3">
-                                                                        <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Validados</span>
-                                                                        <span className="text-lg font-semibold">{getCoverageSummary(company).validated}</span>
-                                                                    </div>
-                                                                    <div className="rounded-md bg-muted/40 p-3">
-                                                                        <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Decisores</span>
-                                                                        <span className="text-lg font-semibold">{getCoverageSummary(company).decisionMakers}</span>
-                                                                    </div>
-                                                                    <div className="rounded-md bg-muted/40 p-3">
-                                                                        <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Influenciadores</span>
-                                                                        <span className="text-lg font-semibold">{getCoverageSummary(company).influencers}</span>
-                                                                    </div>
-                                                                    <div className="rounded-md bg-muted/40 p-3">
-                                                                        <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Operaciones</span>
-                                                                        <span className="text-lg font-semibold">{getCoverageSummary(company).operations}</span>
-                                                                    </div>
-                                                                </div>
-                                                                <p className="mt-3 text-xs text-muted-foreground">
-                                                                    {getCoverageSummary(company).decisionMakers > 0
-                                                                        ? "La cuenta ya tiene al menos un decisor identificado."
-                                                                        : "Todavia falta alguien que realmente mueva la compra."}
-                                                                </p>
-                                                            </div>
-
-                                                            <div className="rounded-lg border bg-background p-4">
-                                                                <h4 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                                                                    <ClipboardList className="h-3.5 w-3.5" /> Playbook de Descubrimiento
-                                                                </h4>
-                                                                <div className="rounded-md bg-blue-50 p-3 text-xs text-blue-900">
-                                                                    <span className="block text-[10px] uppercase tracking-wider text-blue-700">Foco</span>
-                                                                    <p className="mt-1 font-medium">{getDiscoveryPlaybook(company, allInteractions).focus}</p>
-                                                                </div>
-                                                                <div className="mt-3 space-y-2">
-                                                                    {getDiscoveryPlaybook(company, allInteractions).questions.map((question) => (
-                                                                        <div key={question} className="flex items-start gap-2 text-xs text-foreground">
-                                                                            <Target className="mt-0.5 h-3.5 w-3.5 text-blue-600" />
-                                                                            <span>{question}</span>
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                                <p className="mt-3 text-xs text-muted-foreground">
-                                                                    {getDiscoveryPlaybook(company, allInteractions).convertSignal}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-
-                                                        <h4 className="mb-3 flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-muted-foreground"><History className="h-3 w-3" /> Historial de Interacciones - {company.businessName}</h4>
-                                                        <div className="relative ml-2 space-y-4 border-l-2 border-primary/20">
-                                                            {allInteractions.map((interaction, index) => (
-                                                                <div key={interaction.id} className="relative pl-6">
-                                                                    <div className={`absolute -left-[9px] top-1 flex h-4 w-4 items-center justify-center rounded-full border-2 text-[8px] ${index === 0 ? "border-primary bg-primary text-white" : "border-muted-foreground/40 bg-background text-muted-foreground"}`}>{interactionMarker(interaction.type)}</div>
-                                                                    <div className="flex flex-col gap-0.5">
-                                                                        <div className="flex flex-wrap items-center gap-2">
-                                                                            <span className="text-xs font-semibold">{interactionLabel(interaction.type)}</span>
-                                                                            <span className="text-[10px] text-muted-foreground">{new Date(interaction.interactedAt).toLocaleDateString("es-PE", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</span>
-                                                                            {interaction.contact && <Badge variant="outline" className="h-4 text-[10px]">con {interaction.contact.firstName} {interaction.contact.lastName}</Badge>}
-                                                                            {interaction.outcome && <Badge variant="outline" className="h-4 text-[10px]">{OUTCOME_LABELS[interaction.outcome]}</Badge>}
-                                                                            {interaction.scoreImpact > 0 && <span className="text-[10px] font-bold text-emerald-600">+{interaction.scoreImpact} pts</span>}
-                                                                        </div>
-                                                                        {interaction.notes && <p className="text-xs leading-relaxed text-muted-foreground">{interaction.notes}</p>}
-                                                                        {interaction.nextFollowUpDate && <span className={`mt-0.5 flex items-center gap-1 text-[10px] ${interaction.isFollowUpCompleted ? "text-muted-foreground line-through" : "font-semibold text-amber-600"}`}><Calendar className="h-2.5 w-2.5" /> Seguimiento: {new Date(interaction.nextFollowUpDate).toLocaleDateString("es-PE")}{interaction.isFollowUpCompleted && " - Hecho"}</span>}
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                </TableCell>
-                                            </TableRow>
-                                        )}
-                                    </Fragment>
-                                );
-                            })}
-                        </TableBody>
-                    </Table>
-                </div>
-                {totalPages > 1 && (
-                    <div className="flex items-center justify-between border-t border-border px-2 pt-4">
-                        <p className="text-sm text-muted-foreground">Mostrando {(currentPage - 1) * ITEMS_PER_PAGE + 1} a {Math.min(currentPage * ITEMS_PER_PAGE, data.length)} de {data.length} prospectos</p>
-                        <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={currentPage === 1}>Anterior</Button>
-                            <span className="text-sm font-medium">Pagina {currentPage} de {totalPages}</span>
-                            <Button variant="outline" size="sm" onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} disabled={currentPage === totalPages}>Siguiente</Button>
-                        </div>
-                    </div>
-                )}
-            </div>
-        );
-    };
+    const quoteRequested = allInteractions.some((interaction) => interaction.outcome === "REQUESTED_QUOTE");
 
     return (
-        <div className="flex flex-col gap-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight"><PhoneCall className="h-8 w-8 text-amber-500" /> Caceria (Tareas Diarias)</h1>
-                    <p className="mt-1 text-muted-foreground">Tu agenda de prospeccion. Llama, anota en el diario programando la proxima llamada, hasta lograr una cotizacion.</p>
-                </div>
+      <div className="space-y-4 px-3 py-4 sm:px-5 lg:px-6">
+        <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+          <section className="space-y-4 rounded-2xl border border-primary/15 bg-gradient-to-br from-background to-primary/[0.03] p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Sesion de caceria</h4>
+                <p className="mt-1 text-sm text-muted-foreground">El bloque principal del hunter. Aqui se ejecuta el contacto actual y se decide el siguiente paso.</p>
+              </div>
+              <Badge variant="outline" className={readiness.tone}>{readiness.label}</Badge>
             </div>
 
-            <Tabs value={activeTab} onValueChange={(value) => { setActiveTab(value); setCurrentPage(1); }} className="w-full">
-                <TabsList className="mb-6 grid w-full grid-cols-4 lg:w-[600px]">
-                    <TabsTrigger value="today" className="relative">Para Hoy / Atrasadas{grouped.today.length > 0 && <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">{grouped.today.length}</span>}</TabsTrigger>
-                    <TabsTrigger value="new">Nuevos ({grouped.new.length})</TabsTrigger>
-                    <TabsTrigger value="future">Futuros ({grouped.future.length})</TabsTrigger>
-                    <TabsTrigger value="inactive">Inactivos ({grouped.inactive.length})</TabsTrigger>
-                </TabsList>
+            <div className="rounded-xl border bg-background/70 p-3">
+              <div className="flex items-center justify-between text-xs font-medium text-muted-foreground"><span>Avance de sesion</span><span>{session.completedContacts.length}/{session.actionableContacts.length || 0}</span></div>
+              <Progress value={session.progressValue} className="mt-2" />
+              <p className="mt-2 text-xs text-muted-foreground">{session.exhausted ? "Ya agotaste los contactos accionables." : `${session.pendingContacts.length} contacto(s) pendiente(s).`}</p>
+            </div>
 
-                <TabsContent value="today" className="space-y-4">
-                    <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><strong>Objetivo de Hoy:</strong> Tienes {grouped.today.length} empresa(s) agendadas para llamar o que dejaste atrasadas. A cazar.</div>
-                    {renderTable(grouped.today, "No tienes tareas programadas para hoy ni llamadas atrasadas. Estas al dia.")}
-                </TabsContent>
-                <TabsContent value="new">
-                    <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900"><strong>Nuevos Leads:</strong> Empresas que salieron de Investigacion y ya tienen correo o telefono, pero todavia no han sido contactadas.</div>
-                    {renderTable(grouped.new, "No hay prospectos nuevos intocados.")}
-                </TabsContent>
-                <TabsContent value="future">{renderTable(grouped.future, "No tienes tareas programadas para dias posteriores a hoy.")}</TabsContent>
-                <TabsContent value="inactive">
-                    <div className="mb-4 rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600"><strong>Sin Seguimiento:</strong> Empresas a las que llamaste alguna vez, pero olvidaste programarles un proximo seguimiento. Retomalas.</div>
-                    {renderTable(grouped.inactive, "Todas tus interacciones pasadas tienen una futura llamada programada.")}
-                </TabsContent>
-            </Tabs>
+            {currentContact ? (
+              <div className="rounded-2xl border border-primary/20 bg-primary/[0.06] p-4">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h5 className="text-lg font-semibold">{currentContact.firstName} {currentContact.lastName}</h5>
+                      <Badge variant="outline" className={CONTACT_STATUS_STYLES[currentContact.commercialStatus]}>{CONTACT_STATUS_LABELS[currentContact.commercialStatus]}</Badge>
+                      <Badge variant="outline">{BUYING_ROLE_LABELS[currentContact.buyingRole]}</Badge>
+                      {currentContact.linkedin && <a href={currentContact.linkedin.startsWith("http") ? currentContact.linkedin : `https://${currentContact.linkedin}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800"><Linkedin className="h-4 w-4" /></a>}
+                    </div>
+                    <div className="grid gap-2">
+                      {currentContact.phones.map((phone) => <div key={phone} className="flex items-center gap-2 rounded-lg border bg-background px-3 py-2"><PhoneCall className="h-3.5 w-3.5 text-emerald-600" /><span>{phone}</span><button type="button" className="ml-auto text-red-400 hover:text-red-600" onClick={() => removeContactChannel(company.id, currentContact.id, "phone", phone)}><X className="h-3.5 w-3.5" /></button></div>)}
+                      {currentContact.emails.map((email) => <div key={email} className="flex items-center gap-2 rounded-lg border bg-background px-3 py-2"><Mail className="h-3.5 w-3.5 text-blue-600" /><span className="truncate">{email}</span><button type="button" className="ml-auto text-red-400 hover:text-red-600" onClick={() => removeContactChannel(company.id, currentContact.id, "email", email)}><X className="h-3.5 w-3.5" /></button></div>)}
+                    </div>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2 lg:w-[320px] lg:grid-cols-1">
+                    <LogInteractionModal companyId={company.id} contacts={company.contacts} defaultContactId={currentContact.id} lockedContact onSuccess={(payload) => handleInteractionSuccess(company.id, payload)} triggerButton={<Button className="w-full justify-start bg-primary text-primary-foreground shadow-sm"><PhoneCall className="mr-2 h-4 w-4" /> Registrar intento</Button>} />
+                    <CreateTaskModal companyId={company.id} contacts={company.contacts} defaultContactId={currentContact.id} onSuccess={(payload) => handleTaskSuccess(company.id, payload)} triggerButton={<Button variant="outline" className="w-full justify-start"><CalendarClock className="mr-2 h-4 w-4" /> Crear tarea</Button>} />
+                    <Button variant="outline" className="w-full justify-start" asChild><Link href={`/contacts/${currentContact.id}`}><Pencil className="mr-2 h-4 w-4" /> Corregir contacto</Link></Button>
+                    <Button variant="secondary" className="w-full justify-start" onClick={() => finishCurrentContact(company.id)}><CheckCircle2 className="mr-2 h-4 w-4" /> Terminar contacto</Button>
+                    {quoteRequested && <Button className="w-full justify-start bg-emerald-600 hover:bg-emerald-700" asChild><Link href={`/crm/opportunities/new?companyId=${company.id}&contactId=${currentContact.id}`}><TrendingUp className="mr-2 h-4 w-4" /> Abrir oportunidad ahora</Link></Button>}
+                  </div>
+                </div>
+                <div className="mt-4 rounded-lg border bg-background/80 p-3 text-sm text-muted-foreground">{nextTask ? `Proximo seguimiento: ${formatDateTime(nextTask.nextFollowUpDate)}` : "Aun no hay seguimiento programado."}</div>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed bg-muted/20 p-4">
+                <p className="text-sm font-medium">{session.actionableContacts.length === 0 ? "No quedan contactos accionables." : "Ya trabajaste todos los contactos accionables de esta sesion."}</p>
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                  <CreateTaskModal companyId={company.id} contacts={company.contacts} defaultContactId="none" isSimplePostpone onSuccess={(payload) => { handleTaskSuccess(company.id, payload); setPostponedIds((current) => new Set(current).add(company.id)); }} triggerButton={<Button><Calendar className="mr-2 h-4 w-4" /> Posponer cuenta</Button>} />
+                  <Button variant="outline" asChild><Link href={`/contacts/new?companyId=${company.id}`}><Plus className="mr-2 h-4 w-4" /> Anadir contacto</Link></Button>
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-2xl border bg-background p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Historial de interacciones</h4>
+                <p className="mt-1 text-sm text-muted-foreground">Tu memoria operativa inmediata. Antes de volver a llamar, mira esto.</p>
+              </div>
+              <Badge variant="outline">{allInteractions.length} registro(s)</Badge>
+            </div>
+              <div className="mt-4 max-h-[34rem] space-y-3 overflow-y-auto pr-1">
+                {allInteractions.length === 0 ? (
+                  <div className="rounded-lg border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">
+                    Aun no hay interacciones registradas en esta cuenta.
+                  </div>
+                ) : allInteractions.map((interaction) => {
+                  const followUpDate = interaction.nextFollowUpDate ? toDate(interaction.nextFollowUpDate)?.toISOString().split("T")[0] ?? null : null;
+                  const isOverdueFollowUp = Boolean(
+                    followUpDate &&
+                    followUpDate < todayDate &&
+                    !interaction.isFollowUpCompleted
+                  );
+
+                  return (
+                    <div key={interaction.id} className={`relative overflow-hidden rounded-lg border p-3 ${getOutcomeTone(interaction.outcome)}`}>
+                      <div className={`absolute inset-y-0 left-0 w-1 ${getOutcomeAccent(interaction.outcome)}`} />
+                      <div className="pl-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline">{interaction.type}</Badge>
+                          {interaction.contact && (
+                            <Badge variant="outline">
+                              con {interaction.contact.firstName} {interaction.contact.lastName}
+                            </Badge>
+                          )}
+                          {interaction.outcome && (
+                            <Badge variant="outline" className={interaction.outcome === "REQUESTED_QUOTE" ? "border-emerald-300 bg-emerald-100 text-emerald-800" : undefined}>
+                              {OUTCOME_LABELS[interaction.outcome]}
+                            </Badge>
+                          )}
+                          {interaction.nextFollowUpDate && !interaction.isFollowUpCompleted && (
+                            <Badge variant="outline" className={isOverdueFollowUp ? "border-red-300 bg-red-100 text-red-800" : "border-amber-300 bg-amber-100 text-amber-800"}>
+                              {isOverdueFollowUp ? "Seguimiento vencido" : "Seguimiento pendiente"}
+                            </Badge>
+                          )}
+                          {interaction.outcome === "NO_RESPONSE" && (
+                            <Badge variant="outline" className="border-rose-300 bg-rose-100 text-rose-800">
+                              Reintento probable
+                            </Badge>
+                          )}
+                          <span className="text-[11px] text-muted-foreground">
+                            {formatDate(interaction.interactedAt, { day: "2-digit", month: "short", year: "numeric" })}
+                          </span>
+                        </div>
+                        {interaction.notes && (
+                          <p className="mt-2 text-sm text-muted-foreground">{interaction.notes}</p>
+                        )}
+                        {interaction.nextFollowUpDate && (
+                          <p className={`mt-2 text-xs ${isOverdueFollowUp ? "font-medium text-red-700" : "text-muted-foreground"}`}>
+                            {isOverdueFollowUp ? "Vence" : "Programado"}: {formatDateTime(interaction.nextFollowUpDate)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
         </div>
+
+        <section className="rounded-2xl border bg-background/80 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Contexto comercial secundario</p>
+              <p className="mt-1 text-sm text-muted-foreground">Playbook y cobertura ayudan a orientar, pero no deben competir con la sesion ni con el historial.</p>
+            </div>
+            <Button variant="ghost" size="sm" className="xl:hidden" onClick={() => setContextExpandedCompanies((current) => { const next = new Set(current); if (next.has(company.id)) next.delete(company.id); else next.add(company.id); return next; })}>{showContext ? "Ocultar" : "Ver contexto"}</Button>
+          </div>
+          <div className={`${showContext ? "grid" : "hidden"} mt-4 gap-4 xl:grid xl:grid-cols-2`}>
+            <div className="rounded-xl border bg-background p-4 opacity-90"><h4 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground"><ClipboardList className="h-3.5 w-3.5" /> Playbook</h4><div className="rounded-md bg-blue-50 p-3 text-xs text-blue-900"><span className="block text-[10px] uppercase tracking-wider text-blue-700">Foco</span><p className="mt-1 font-medium">{playbook.focus}</p></div><div className="mt-3 space-y-2">{playbook.questions.map((question) => <div key={question} className="flex items-start gap-2 text-xs"><Target className="mt-0.5 h-3.5 w-3.5 text-blue-600" /><span>{question}</span></div>)}</div></div>
+            <div className="rounded-xl border bg-background p-4 opacity-90"><h4 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground"><UserRoundSearch className="h-3.5 w-3.5" /> Cobertura de Cuenta</h4><div className="grid grid-cols-2 gap-3 text-xs"><div className="rounded-md bg-muted/40 p-3"><span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Validados</span><span className="text-lg font-semibold">{coverage.validated}</span></div><div className="rounded-md bg-muted/40 p-3"><span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Decisores</span><span className="text-lg font-semibold">{coverage.decisionMakers}</span></div><div className="rounded-md bg-muted/40 p-3"><span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Influenciadores</span><span className="text-lg font-semibold">{coverage.influencers}</span></div><div className="rounded-md bg-muted/40 p-3"><span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Operaciones</span><span className="text-lg font-semibold">{coverage.operations}</span></div></div></div>
+          </div>
+        </section>
+      </div>
     );
+  };
+
+  const renderDesktopTable = (data: ProspectingCompanyView[], emptyMessage: string) => {
+    const totalPages = Math.ceil(data.length / ITEMS_PER_PAGE);
+    const paginatedData = data.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+    return (
+      <div className="hidden flex-col gap-4 md:flex">
+        <div className="overflow-hidden rounded-md border bg-card">
+          <Table>
+            <TableHeader><TableRow><TableHead>Prospecto</TableHead><TableHead>Sesion actual</TableHead><TableHead>Seguimiento</TableHead><TableHead>Termometro</TableHead><TableHead className="text-right">Accion</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {paginatedData.length === 0 ? <TableRow><TableCell colSpan={5} className="h-32 text-center text-muted-foreground">{emptyMessage}</TableCell></TableRow> : paginatedData.map((item) => {
+                const session = getSession(item.company, sessionByCompany[item.company.id]);
+                const readiness = getReadiness(item.company, item.allInteractions);
+                const bestContact = getBestOpportunityContact(item.company);
+                const isExpanded = expandedCompanies.has(item.company.id);
+                const isOverdue = Boolean(item.nextTaskFormattedDate && item.nextTaskFormattedDate < todayDate);
+                const isToday = Boolean(item.nextTaskFormattedDate && item.nextTaskFormattedDate === todayDate);
+                return (
+                  <Fragment key={item.company.id}>
+                    <TableRow className={isExpanded ? "border-b-0" : ""}>
+                      <TableCell><div className="flex items-start gap-3"><Building2 className="mt-0.5 h-4 w-4 text-muted-foreground" /><div className="space-y-2"><div><p className="font-medium leading-none">{item.company.businessName}</p><p className="mt-1 text-[10px] text-muted-foreground">RUC: {item.company.documentNumber}</p></div><div className="flex flex-wrap gap-2"><Badge variant="outline" className={readiness.tone}>{readiness.label}</Badge><Badge variant="secondary">{item.company.leadScore} pts</Badge></div></div></div></TableCell>
+                      <TableCell><div className="space-y-2 text-sm">{session.currentContact ? <><div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{session.currentContact.firstName} {session.currentContact.lastName}</span><Badge variant="outline" className={`h-4 text-[9px] ${CONTACT_STATUS_STYLES[session.currentContact.commercialStatus]}`}>{CONTACT_STATUS_LABELS[session.currentContact.commercialStatus]}</Badge></div><p className="text-xs text-muted-foreground">Pendientes: {session.pendingContacts.length} - Trabajados: {session.completedContacts.length}</p></> : <p className="text-xs text-muted-foreground">Sin contactos pendientes</p>}<button type="button" onClick={() => toggleExpand(item.company.id)} className="flex items-center gap-1 text-[11px] text-primary hover:underline"><History className="h-3 w-3" /> {isExpanded ? "Ocultar" : "Abrir"} detalle {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}</button></div></TableCell>
+                      <TableCell>{item.nextTask ? <div className="flex flex-col gap-1"><span className={`flex items-center text-xs font-bold ${isOverdue ? "text-red-600" : isToday ? "text-amber-600" : "text-blue-600"}`}>{isOverdue && <AlertCircle className="mr-1 h-3 w-3" />}{isToday && <Clock className="mr-1 h-3 w-3" />}{!isOverdue && !isToday && <Calendar className="mr-1 h-3 w-3" />}{isOverdue ? `Atrasado: ${item.nextTaskFormattedDate}` : isToday ? "Toca hoy" : `Proximo: ${item.nextTaskFormattedDate}`}</span><span className="max-w-[150px] truncate text-[10px] text-muted-foreground">Ult. nota: {item.lastInteraction?.notes || "Ninguna"}</span></div> : <Badge variant="outline" className="border-dashed text-muted-foreground">Sin seguimiento</Badge>}</TableCell>
+                      <TableCell><div className="space-y-2"><Progress value={session.progressValue} /><p className="text-xs text-muted-foreground">Sesion {session.progressValue}% completada</p></div></TableCell>
+                      <TableCell className="text-right"><div className="flex flex-col items-end gap-2">{session.currentContact ? <Button size="sm" variant="outline" className="h-8 w-[170px]" onClick={() => openSession(item.company.id)}><PhoneCall className="mr-1 h-3 w-3" /> Continuar sesion</Button> : <CreateTaskModal companyId={item.company.id} contacts={item.company.contacts} defaultContactId="none" isSimplePostpone onSuccess={(payload) => { handleTaskSuccess(item.company.id, payload); setPostponedIds((current) => new Set(current).add(item.company.id)); }} triggerButton={<Button size="sm" variant="outline" className="h-8 w-[170px] border-dashed border-primary/50 text-primary"><Calendar className="mr-1 h-3 w-3" /> Posponer cuenta</Button>} />}<Button variant={readiness.ready ? "default" : "ghost"} size="sm" className={readiness.ready ? "h-8 w-[170px] bg-emerald-600 hover:bg-emerald-700" : "h-7 w-[170px] text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"} asChild><Link href={`/crm/opportunities/new?companyId=${item.company.id}${bestContact ? `&contactId=${bestContact.id}` : ""}`}><TrendingUp className="mr-1 h-3 w-3" /> {readiness.ready ? "Abrir oportunidad" : "Aun verde"}</Link></Button><DisqualifyModal companyId={item.company.id} companyName={item.company.businessName} onSuccess={() => setPostponedIds((current) => new Set(current).add(item.company.id))} triggerButton={<Button variant="ghost" size="sm" className="h-7 w-[170px] text-red-500 hover:bg-red-50 hover:text-red-700"><Trash2 className="mr-1 h-3 w-3" /> Descartar</Button>} /></div></TableCell>
+                    </TableRow>
+                    {isExpanded && <TableRow><TableCell colSpan={5} className="bg-muted/30 p-0">{renderExpanded(item)}</TableCell></TableRow>}
+                  </Fragment>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+        {totalPages > 1 && <div className="flex items-center justify-between border-t border-border px-2 pt-4"><p className="text-sm text-muted-foreground">Mostrando {(currentPage - 1) * ITEMS_PER_PAGE + 1} a {Math.min(currentPage * ITEMS_PER_PAGE, data.length)} de {data.length} prospectos</p><div className="flex items-center gap-2"><Button variant="outline" size="sm" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={currentPage === 1}>Anterior</Button><span className="text-sm font-medium">Pagina {currentPage} de {totalPages}</span><Button variant="outline" size="sm" onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} disabled={currentPage === totalPages}>Siguiente</Button></div></div>}
+      </div>
+    );
+  };
+
+  const renderMobileCards = (data: ProspectingCompanyView[], emptyMessage: string) => (
+    <div className="space-y-4 md:hidden">
+      {data.length === 0 ? <div className="rounded-xl border bg-card p-6 text-center text-sm text-muted-foreground">{emptyMessage}</div> : data.map((item) => {
+        const session = getSession(item.company, sessionByCompany[item.company.id]);
+        const readiness = getReadiness(item.company, item.allInteractions);
+        const isExpanded = expandedCompanies.has(item.company.id);
+        return (
+          <div key={item.company.id} className="overflow-hidden rounded-xl border bg-card">
+            <div className="space-y-4 p-4">
+              <div className="flex items-start justify-between gap-3"><div className="space-y-2"><div className="flex items-center gap-2"><Building2 className="h-4 w-4 text-muted-foreground" /><h3 className="font-semibold">{item.company.businessName}</h3></div><p className="text-xs text-muted-foreground">RUC: {item.company.documentNumber}</p><div className="flex flex-wrap gap-2"><Badge variant="outline" className={readiness.tone}>{readiness.label}</Badge><Badge variant="secondary">{item.company.leadScore} pts</Badge></div></div><button type="button" onClick={() => toggleExpand(item.company.id)} className="inline-flex h-8 w-8 items-center justify-center rounded-md border bg-background">{isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</button></div>
+              <div className="rounded-lg border bg-muted/20 p-3 text-sm">{session.currentContact ? <><p className="font-medium">Contacto actual</p><p className="mt-1">{session.currentContact.firstName} {session.currentContact.lastName}</p><p className="mt-1 text-xs text-muted-foreground">Pendientes: {session.pendingContacts.length} - Trabajados: {session.completedContacts.length}</p></> : <><p className="font-medium">Sin contactos accionables pendientes</p><p className="mt-1 text-xs text-muted-foreground">Programa seguimiento o actualiza la base.</p></>}</div>
+              <Button variant="outline" onClick={() => openSession(item.company.id)}>{session.currentContact ? "Continuar sesion" : "Abrir detalle"}</Button>
+            </div>
+            {isExpanded && <div className="border-t bg-muted/20">{renderExpanded(item)}</div>}
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const renderGroup = (data: ProspectingCompanyView[], emptyMessage: string) => (
+    <>
+      {renderMobileCards(data, emptyMessage)}
+      {renderDesktopTable(data, emptyMessage)}
+    </>
+  );
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight sm:text-3xl">
+          <PhoneCall className="h-7 w-7 text-amber-500 sm:h-8 sm:w-8" />
+          Caceria (Tareas Diarias)
+        </h1>
+        <p className="mt-1 max-w-3xl text-sm text-muted-foreground sm:text-base">
+          Caceria termina cuando la empresa pide su primera cotizacion. Trabaja contacto por contacto, registra cada intento y solo pospone la cuenta cuando ya agotaste la sesion.
+        </p>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={(value) => { setActiveTab(value); setCurrentPage(1); }} className="w-full">
+        <TabsList className="mb-4 grid h-auto w-full grid-cols-2 gap-2 sm:grid-cols-4 md:mb-6 lg:w-[700px]">
+          <TabsTrigger value="today" className="relative">Hoy{grouped.today.length > 0 && <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">{grouped.today.length}</span>}</TabsTrigger>
+          <TabsTrigger value="queue">En Cola ({grouped.queue.length})</TabsTrigger>
+          <TabsTrigger value="exhausted">Agotadas ({grouped.exhausted.length})</TabsTrigger>
+          <TabsTrigger value="inactive">Sin Siguiente Paso ({grouped.noNextStep.length})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="today" className="space-y-4">
+          <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><strong>Hoy:</strong> Aqui vive lo urgente. Son cuentas con seguimiento para hoy o atrasado y todavia con sesion util por trabajar.</div>
+          {renderGroup(grouped.today, "No tienes tareas programadas para hoy ni llamadas atrasadas. Estas al dia.")}
+        </TabsContent>
+        <TabsContent value="queue">
+          <div className="rounded-md border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900"><strong>En Cola:</strong> Empresas nuevas o futuras que existen en tu radar, pero que no requieren accion hoy.</div>
+          {renderGroup(grouped.queue, "No tienes cuentas en cola por ahora.")}
+        </TabsContent>
+        <TabsContent value="exhausted">
+          <div className="rounded-md border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900"><strong>Agotadas:</strong> Cuentas donde ya no quedan contactos accionables en la sesion actual. Aqui toca posponer o enriquecer la base.</div>
+          {renderGroup(grouped.exhausted, "No tienes cuentas agotadas en este momento.")}
+        </TabsContent>
+        <TabsContent value="inactive">
+          <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600"><strong>Sin Siguiente Paso:</strong> Empresas con historial pero sin una accion futura programada. Son fugas de disciplina comercial.</div>
+          {renderGroup(grouped.noNextStep, "Todas tus cuentas activas tienen un siguiente paso claro.")}
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
 }

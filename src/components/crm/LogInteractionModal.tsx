@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 import { createInteraction } from "@/app/actions/crm/interaction-actions";
-import type { ContactBuyingRole, ContactCommercialStatus, FollowUpType, InteractionOutcome, InteractionType } from "@prisma/client";
+import type {
+    ContactBuyingRole,
+    ContactCommercialStatus,
+    FollowUpType,
+    InteractionOutcome,
+    InteractionType,
+} from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,10 +24,10 @@ import {
     Dialog,
     DialogContent,
     DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-    DialogFooter,
 } from "@/components/ui/dialog";
 import { PhoneCall } from "lucide-react";
 
@@ -31,76 +37,155 @@ interface InteractionContactOption {
     lastName: string;
 }
 
+export interface LogInteractionSuccessPayload {
+    interaction: {
+        id: string;
+        type: InteractionType;
+        outcome: InteractionOutcome | null;
+        interactedAt: Date;
+        scoreImpact: number;
+        notes: string | null;
+        nextFollowUpDate: Date | null;
+        isFollowUpCompleted: boolean;
+        followUpType: FollowUpType | null;
+        contactId: string | null;
+        contact: {
+            firstName: string;
+            lastName: string;
+        } | null;
+    };
+    contactUpdate?: {
+        id: string;
+        commercialStatus: ContactCommercialStatus;
+        buyingRole: ContactBuyingRole;
+        lastValidatedAt: Date | null;
+    };
+}
+
 interface LogInteractionModalProps {
     companyId: string;
     opportunityId?: string;
     contacts: InteractionContactOption[];
-    onSuccess?: () => void;
+    onSuccess?: (payload: LogInteractionSuccessPayload) => void;
     triggerButton?: React.ReactNode;
     defaultContactId?: string;
     lockedContact?: boolean;
 }
 
-export function LogInteractionModal({ companyId, opportunityId, contacts, onSuccess, triggerButton, defaultContactId, lockedContact }: LogInteractionModalProps) {
+export function LogInteractionModal({
+    companyId,
+    opportunityId,
+    contacts,
+    onSuccess,
+    triggerButton,
+    defaultContactId,
+    lockedContact,
+}: LogInteractionModalProps) {
     const [open, setOpen] = useState(false);
-    const [type, setType] = useState<InteractionType>("EMAIL_SENT"); // Por defecto correo enviado como seguimiento
+    const [type, setType] = useState<InteractionType>("EMAIL_SENT");
     const [outcome, setOutcome] = useState<InteractionOutcome>("NO_RESPONSE");
     const [notes, setNotes] = useState("");
     const [contactId, setContactId] = useState(defaultContactId || contacts[0]?.id || "");
     const [contactCommercialStatus, setContactCommercialStatus] = useState<ContactCommercialStatus>("VALIDATED_NO_RESPONSE");
     const [contactBuyingRole, setContactBuyingRole] = useState<ContactBuyingRole>("UNKNOWN");
-    // Tarea Futura
     const [createTask, setCreateTask] = useState(false);
     const [nextFollowUpDate, setNextFollowUpDate] = useState("");
     const [followUpType, setFollowUpType] = useState<FollowUpType>("CALL");
-
     const [loading, setLoading] = useState(false);
 
-    const getScoreImpact = (t: InteractionType) => {
-        switch (t) {
-            case "LINKEDIN_CONNECT": return 2;
-            case "LINKEDIN_MESSAGE": return 3;
-            case "EMAIL_SENT": return 1;
-            case "EMAIL_OPENED": return 5;
-            case "WHATSAPP_SENT": return 6;
-            case "CALL_MADE": return 10;
-            case "MEETING": return 25;
-            default: return 0;
+    const getScoreImpact = (interactionType: InteractionType) => {
+        switch (interactionType) {
+            case "LINKEDIN_CONNECT":
+                return 2;
+            case "LINKEDIN_MESSAGE":
+                return 3;
+            case "EMAIL_SENT":
+                return 1;
+            case "EMAIL_OPENED":
+                return 5;
+            case "WHATSAPP_SENT":
+                return 6;
+            case "CALL_MADE":
+                return 10;
+            case "MEETING":
+                return 25;
+            default:
+                return 0;
         }
     };
 
+    const resetForm = () => {
+        setNotes("");
+        setNextFollowUpDate("");
+        setOutcome("NO_RESPONSE");
+        setContactCommercialStatus("VALIDATED_NO_RESPONSE");
+        setContactBuyingRole("UNKNOWN");
+        setCreateTask(false);
+    };
+
     const handleSave = async () => {
-        if (!notes) return;
+        if (!notes) {
+            return;
+        }
+
         setLoading(true);
 
+        const safeContactId = contactId && contactId !== "none" ? contactId : undefined;
+        const scoreImpact = getScoreImpact(type);
         const result = await createInteraction({
             companyId,
-            contactId: contactId && contactId !== "none" ? contactId : undefined,
+            contactId: safeContactId,
             opportunityId,
             type,
             outcome,
             notes,
-            scoreImpact: getScoreImpact(type),
+            scoreImpact,
             interactedAt: new Date().toISOString(),
             nextFollowUpDate: createTask && nextFollowUpDate ? new Date(nextFollowUpDate).toISOString() : undefined,
             followUpType: createTask && nextFollowUpDate ? followUpType : undefined,
-            contactCommercialStatus: contactId && contactId !== "none" ? contactCommercialStatus : undefined,
-            contactBuyingRole: contactId && contactId !== "none" ? contactBuyingRole : undefined,
+            contactCommercialStatus: safeContactId ? contactCommercialStatus : undefined,
+            contactBuyingRole: safeContactId ? contactBuyingRole : undefined,
         });
 
         setLoading(false);
 
-        if (result.success) {
-            setOpen(false);
-            setNotes("");
-            setNextFollowUpDate("");
-            setOutcome("NO_RESPONSE");
-            setContactCommercialStatus("VALIDATED_NO_RESPONSE");
-            setContactBuyingRole("UNKNOWN");
-            if (onSuccess) onSuccess();
-        } else {
-            alert("Error guardando la interacción.");
+        if (!result.success || !result.data) {
+            alert("Error guardando la interaccion.");
+            return;
         }
+
+        const selectedContact = contacts.find((contact) => contact.id === safeContactId) ?? null;
+        onSuccess?.({
+            interaction: {
+                id: result.data.id,
+                type,
+                outcome,
+                interactedAt: new Date(result.data.interactedAt),
+                scoreImpact,
+                notes,
+                nextFollowUpDate: createTask && nextFollowUpDate ? new Date(nextFollowUpDate) : null,
+                isFollowUpCompleted: false,
+                followUpType: createTask && nextFollowUpDate ? followUpType : null,
+                contactId: safeContactId ?? null,
+                contact: selectedContact
+                    ? {
+                        firstName: selectedContact.firstName,
+                        lastName: selectedContact.lastName,
+                    }
+                    : null,
+            },
+            contactUpdate: safeContactId
+                ? {
+                    id: safeContactId,
+                    commercialStatus: contactCommercialStatus,
+                    buyingRole: contactBuyingRole,
+                    lastValidatedAt: contactCommercialStatus === "UNVALIDATED" ? null : new Date(),
+                }
+                : undefined,
+        });
+
+        setOpen(false);
+        resetForm();
     };
 
     return (
@@ -108,24 +193,24 @@ export function LogInteractionModal({ companyId, opportunityId, contacts, onSucc
             <DialogTrigger asChild>
                 {triggerButton || (
                     <Button size="sm">
-                        <PhoneCall className="h-4 w-4 mr-2" /> Anotar en Diario
+                        <PhoneCall className="mr-2 h-4 w-4" /> Anotar en Diario
                     </Button>
                 )}
             </DialogTrigger>
 
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[500px]">
                 <DialogHeader>
-                    <DialogTitle>Anotar Nueva Interacción</DialogTitle>
+                    <DialogTitle>Anotar Nueva Interaccion</DialogTitle>
                     <DialogDescription>
-                        Registra los resultados de tu llamada o correo. El Termómetro (Lead Score) subirá automáticamente.
+                        Registra el intento, el resultado y el siguiente paso sin salir de la sesion de caceria.
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
-                            <Label>Tipo de Acción</Label>
-                            <Select value={type} onValueChange={(val: InteractionType) => setType(val)}>
+                            <Label>Tipo de accion</Label>
+                            <Select value={type} onValueChange={(value) => setType(value as InteractionType)}>
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
@@ -134,7 +219,7 @@ export function LogInteractionModal({ companyId, opportunityId, contacts, onSucc
                                     <SelectItem value="EMAIL_OPENED">Correo Abierto (+5)</SelectItem>
                                     <SelectItem value="WHATSAPP_SENT">WhatsApp Enviado (+6)</SelectItem>
                                     <SelectItem value="CALL_MADE">Llamada Realizada (+10)</SelectItem>
-                                    <SelectItem value="MEETING">Reunión Comercial (+25)</SelectItem>
+                                    <SelectItem value="MEETING">Reunion Comercial (+25)</SelectItem>
                                     <SelectItem value="LINKEDIN_CONNECT">Conectar LinkedIn (+2)</SelectItem>
                                     <SelectItem value="LINKEDIN_MESSAGE">Mensaje LinkedIn (+3)</SelectItem>
                                 </SelectContent>
@@ -142,16 +227,16 @@ export function LogInteractionModal({ companyId, opportunityId, contacts, onSucc
                         </div>
 
                         <div className="space-y-2">
-                            <Label>Con quién hablaste</Label>
+                            <Label>Con quien hablaste</Label>
                             <Select value={contactId} onValueChange={setContactId} disabled={lockedContact}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Contacto..." />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {!lockedContact && <SelectItem value="none">Ninguno / General</SelectItem>}
-                                    {contacts.map(c => (
-                                        <SelectItem key={c.id} value={c.id}>
-                                            {c.firstName} {c.lastName}
+                                    {contacts.map((contact) => (
+                                        <SelectItem key={contact.id} value={contact.id}>
+                                            {contact.firstName} {contact.lastName}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
@@ -184,7 +269,10 @@ export function LogInteractionModal({ companyId, opportunityId, contacts, onSucc
 
                         <div className="space-y-2">
                             <Label>Estado comercial</Label>
-                            <Select value={contactCommercialStatus} onValueChange={(value) => setContactCommercialStatus(value as ContactCommercialStatus)}>
+                            <Select
+                                value={contactCommercialStatus}
+                                onValueChange={(value) => setContactCommercialStatus(value as ContactCommercialStatus)}
+                            >
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
@@ -220,51 +308,51 @@ export function LogInteractionModal({ companyId, opportunityId, contacts, onSucc
                     </div>
 
                     <div className="space-y-2">
-                        <Label>Notas del Cazador</Label>
+                        <Label>Notas del cazador</Label>
                         <Textarea
-                            placeholder="¿Qué te dijeron? ¿Qué necesitan? ¿Cuándo operan?"
-                            className="min-h-[80px]"
+                            placeholder="Que te dijeron, que necesitan y cual es el siguiente movimiento comercial."
+                            className="min-h-[96px]"
                             value={notes}
-                            onChange={(e) => setNotes(e.target.value)}
+                            onChange={(event) => setNotes(event.target.value)}
                         />
                     </div>
 
-                    <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
                         <div className="flex flex-col gap-4">
-                            <label className="flex items-center gap-2 text-amber-900 font-semibold cursor-pointer">
+                            <label className="flex cursor-pointer items-center gap-2 font-semibold text-amber-900">
                                 <input
                                     type="checkbox"
                                     className="rounded border-amber-300 text-amber-600 focus:ring-amber-500"
                                     checked={createTask}
-                                    onChange={(e) => setCreateTask(e.target.checked)}
+                                    onChange={(event) => setCreateTask(event.target.checked)}
                                 />
-                                Programar Tarea (Próximo Seguimiento)
+                                Programar tarea de seguimiento
                             </label>
 
                             {createTask && (
-                                <div className="grid grid-cols-2 gap-4 pl-6 border-l-2 border-amber-200">
+                                <div className="grid grid-cols-1 gap-4 border-l-2 border-amber-200 pl-4 sm:grid-cols-2">
                                     <div className="space-y-2">
-                                        <Label className="text-amber-900">¿Qué harás?</Label>
+                                        <Label className="text-amber-900">Proxima accion</Label>
                                         <Select value={followUpType} onValueChange={(value) => setFollowUpType(value as FollowUpType)}>
                                             <SelectTrigger className="bg-white">
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="CALL">📞 Llamar</SelectItem>
-                                                <SelectItem value="WHATSAPP">💬 Enviar WhatsApp</SelectItem>
-                                                <SelectItem value="EMAIL">✉️ Enviar Correo</SelectItem>
-                                                <SelectItem value="LINKEDIN">💼 Conectar/Mensaje LinkedIn</SelectItem>
-                                                <SelectItem value="MEETING">🤝 Tener Reunión</SelectItem>
-                                                <SelectItem value="OTHER">📌 Otra Acción</SelectItem>
+                                                <SelectItem value="CALL">Llamar</SelectItem>
+                                                <SelectItem value="WHATSAPP">Enviar WhatsApp</SelectItem>
+                                                <SelectItem value="EMAIL">Enviar Correo</SelectItem>
+                                                <SelectItem value="LINKEDIN">Conectar/Mensaje LinkedIn</SelectItem>
+                                                <SelectItem value="MEETING">Tener Reunion</SelectItem>
+                                                <SelectItem value="OTHER">Otra Accion</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label className="text-amber-900">Fecha y Hora</Label>
+                                        <Label className="text-amber-900">Fecha y hora</Label>
                                         <Input
                                             type="datetime-local"
                                             value={nextFollowUpDate}
-                                            onChange={(e) => setNextFollowUpDate(e.target.value)}
+                                            onChange={(event) => setNextFollowUpDate(event.target.value)}
                                             className="bg-white"
                                             required={createTask}
                                         />
@@ -275,10 +363,10 @@ export function LogInteractionModal({ companyId, opportunityId, contacts, onSucc
                     </div>
                 </div>
 
-                <DialogFooter>
+                <DialogFooter className="gap-2 sm:gap-0">
                     <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
                     <Button onClick={handleSave} disabled={!notes || loading}>
-                        {loading ? "Guardando..." : "Guardar Nota"}
+                        {loading ? "Guardando..." : "Guardar Interaccion"}
                     </Button>
                 </DialogFooter>
             </DialogContent>
