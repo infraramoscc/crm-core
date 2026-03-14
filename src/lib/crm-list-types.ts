@@ -3,13 +3,22 @@ import type {
     CompanyType,
     ContactBuyingRole,
     ContactCommercialStatus,
+    DecisionStyle,
+    ProspectingStatus,
     OpportunityServiceLine,
+    PreferredContactChannel,
+    PreferredContactWindow,
+    RelationshipStrength,
     ShipmentMode,
     OpportunityFrequency,
     FollowUpType,
     ImportVolume,
     InteractionOutcome,
     InteractionType,
+    ResearchEffort,
+    ResearchPriority,
+    ResearchSourceChannel,
+    ResearchStatus,
     TradeRole,
     ValueDriver,
     OpportunityStage,
@@ -22,13 +31,32 @@ export interface CompanyListItem {
     documentType: string;
     documentNumber: string;
     companyType: CompanyType;
+    tradeRole: TradeRole;
+    website: string | null;
     city: string | null;
     countryCode: string | null;
     isActive: boolean;
+    prospectingStatus: ProspectingStatus;
+    dominantIncoterm: string | null;
+    dominantCustomsChannel: string | null;
+    researchLastReviewedAt: Date | null;
+    createdAt: Date;
+    contacts: {
+        id: string;
+        isActive: boolean;
+    }[];
+    opportunities: {
+        id: string;
+    }[];
+    interactions: {
+        id: string;
+        interactedAt: Date;
+    }[];
 }
 
 export interface ContactListItem {
     id: string;
+    profileId: string | null;
     firstName: string;
     lastName: string;
     companyId: string;
@@ -40,6 +68,20 @@ export interface ContactListItem {
     buyingRole: ContactBuyingRole;
     company: {
         businessName: string;
+    } | null;
+    profile: {
+        relationshipStrength: RelationshipStrength;
+        preferredContactChannel: PreferredContactChannel | null;
+        decisionStyle: DecisionStyle | null;
+        primaryDriver: ValueDriver;
+        nextPersonalTouchAt: Date | null;
+        contacts: {
+            id: string;
+            companyId: string;
+            company: {
+                businessName: string;
+            } | null;
+        }[];
     } | null;
 }
 
@@ -66,14 +108,32 @@ export interface InvestigationContactItem {
     lastName: string;
     isActive: boolean;
     inactiveReason: string | null;
+    position: string | null;
+    emails: string[];
+    phones: string[];
+    linkedin: string | null;
+    buyingRole: ContactBuyingRole;
+    sourceChannel: ResearchSourceChannel | null;
 }
 
 export interface InvestigationCompanyItem {
     id: string;
     businessName: string;
+    website: string | null;
     documentType: string;
     documentNumber: string;
     annualDams: number | null;
+    dominantIncoterm: string | null;
+    dominantCustomsChannel: string | null;
+    researchPriority: ResearchPriority;
+    researchEffort: ResearchEffort;
+    researchStatus: ResearchStatus;
+    researchSourceChannel: ResearchSourceChannel | null;
+    researchLastFinding: string | null;
+    researchSummary: string | null;
+    researchNextAction: string | null;
+    researchLastReviewedAt: Date | null;
+    createdAt: Date;
     contacts: InvestigationContactItem[];
 }
 
@@ -139,14 +199,38 @@ export interface CompanyUpdateInput {
     tradeRole?: TradeRole;
     isActive?: boolean;
     annualDams?: number;
+    dominantIncoterm?: string;
+    dominantCustomsChannel?: string;
     importVolume?: ImportVolume;
     valueDriver?: ValueDriver;
     strategyTags?: string;
+    researchPriority?: ResearchPriority;
+    researchEffort?: ResearchEffort;
+    researchStatus?: ResearchStatus;
+    researchSourceChannel?: ResearchSourceChannel;
+    researchLastFinding?: string;
+    researchSummary?: string;
+    researchNextAction?: string;
+    researchLastReviewedAt?: string;
     prospectingStatus?: "COLD" | "PROSPECTING" | "QUALIFIED" | "CUSTOMER" | "DISQUALIFIED";
     legalRepresentative?: string;
     address?: string;
     city?: string;
     countryCode?: string;
+}
+
+export interface ContactProfileInput {
+    relationshipStrength?: RelationshipStrength;
+    preferredContactChannel?: PreferredContactChannel;
+    preferredContactWindow?: PreferredContactWindow;
+    decisionStyle?: DecisionStyle;
+    primaryDriver?: ValueDriver;
+    typicalObjection?: string;
+    giftPreferences?: string;
+    doNotGift?: string;
+    visitNotes?: string;
+    lastMeaningfulInteractionAt?: string;
+    nextPersonalTouchAt?: string;
 }
 
 export type CompanyDetail = Prisma.CompanyGetPayload<{
@@ -174,6 +258,23 @@ export type ContactDetail = Prisma.ContactGetPayload<{
             select: {
                 id: true;
                 businessName: true;
+            };
+        };
+        profile: {
+            include: {
+                contacts: {
+                    include: {
+                        company: {
+                            select: {
+                                id: true;
+                                businessName: true;
+                            };
+                        };
+                    };
+                    orderBy: {
+                        createdAt: "desc";
+                    };
+                };
             };
         };
     };

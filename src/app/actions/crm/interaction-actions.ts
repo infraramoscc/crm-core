@@ -54,6 +54,22 @@ export async function createInteraction(data: {
             });
         }
 
+        if (data.contactId) {
+            const contact = await prisma.contact.findUnique({
+                where: { id: data.contactId },
+                select: { profileId: true },
+            });
+
+            if (contact?.profileId) {
+                await prisma.contactProfile.update({
+                    where: { id: contact.profileId },
+                    data: {
+                        lastMeaningfulInteractionAt: data.interactedAt ? new Date(data.interactedAt) : new Date(),
+                    },
+                });
+            }
+        }
+
         // Actualizar Lead Score de la empresa sumando el impacto
         if (data.scoreImpact && data.scoreImpact > 0) {
             await prisma.company.update({

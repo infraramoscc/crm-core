@@ -44,6 +44,8 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
             companyType: companyType as CompanyType,
             tradeRole: formData.get('tradeRole') as TradeRole,
             annualDams: formData.get('annualDams') ? parseInt(formData.get('annualDams') as string, 10) : undefined,
+            dominantIncoterm: (formData.get('dominantIncoterm') as string) || undefined,
+            dominantCustomsChannel: (formData.get('dominantCustomsChannel') as string) || undefined,
             legalRepresentative: (formData.get('legalRepresentative') as string) || undefined,
             address: (formData.get('address') as string) || undefined,
             city: (formData.get('city') as string) || undefined,
@@ -65,6 +67,8 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
                 companyType: companyData.companyType,
                 tradeRole: companyData.tradeRole,
                 annualDams: companyData.annualDams,
+                dominantIncoterm: companyData.dominantIncoterm,
+                dominantCustomsChannel: companyData.dominantCustomsChannel,
                 legalRepresentative: companyData.legalRepresentative,
                 importVolume: companyData.importVolume,
                 valueDriver: companyData.valueDriver,
@@ -125,7 +129,7 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
                         <CardHeader>
                             <CardTitle>Datos Generales</CardTitle>
                             <CardDescription>
-                                Información comercial y fiscal de la entidad.
+                                La cuenta maestra debe poder nacer con lo minimo. El resto se enriquece despues desde investigacion, caceria y oportunidad.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
@@ -138,24 +142,6 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
                                         defaultValue={initialData?.businessName}
                                         placeholder="Ej. Importaciones Globales S.A.C."
                                         required
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="tradeName">Nombre Comercial</Label>
-                                    <Input
-                                        id="tradeName"
-                                        name="tradeName"
-                                        defaultValue={initialData?.tradeName ?? ""}
-                                        placeholder="Ej. Global Imports"
-                                    />
-                                </div>
-                                <div className="space-y-2 md:col-span-2">
-                                    <Label htmlFor="legalRepresentative">Representante Legal</Label>
-                                    <Input
-                                        id="legalRepresentative"
-                                        name="legalRepresentative"
-                                        defaultValue={initialData?.legalRepresentative ?? ""}
-                                        placeholder="Ej. Juan Pérez"
                                     />
                                 </div>
 
@@ -184,40 +170,69 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
                                     />
                                 </div>
 
-                                <div className="space-y-2">
-                                    <Label htmlFor="companyType">Tipo de Entidad *</Label>
-                                    <Select value={companyType} onValueChange={(value) => setCompanyType(value as CompanyType)}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Selecciona el tipo" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="CLIENT">Cliente (Importador/Exportador)</SelectItem>
-                                            <SelectItem value="AGENT">Agente de Carga</SelectItem>
-                                            <SelectItem value="CUSTOMS">Agencia de Aduanas</SelectItem>
-                                            <SelectItem value="TRANSPORTER">Transportista Terrestre</SelectItem>
-                                            <SelectItem value="LINE">Línea Naviera/Aérea</SelectItem>
-                                            <SelectItem value="WAREHOUSE">Almacén (Depósito)</SelectItem>
-                                            <SelectItem value="OTHER">Otro Proveedor</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+                                {isEditing && (
+                                    <>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="tradeName">Nombre Comercial</Label>
+                                            <Input
+                                                id="tradeName"
+                                                name="tradeName"
+                                                defaultValue={initialData?.tradeName ?? ""}
+                                                placeholder="Ej. Global Imports"
+                                            />
+                                        </div>
+                                        <div className="space-y-2 md:col-span-2">
+                                            <Label htmlFor="legalRepresentative">Representante Legal</Label>
+                                            <Input
+                                                id="legalRepresentative"
+                                                name="legalRepresentative"
+                                                defaultValue={initialData?.legalRepresentative ?? ""}
+                                                placeholder="Ej. Juan Pérez"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="companyType">Tipo de Entidad *</Label>
+                                            <Select value={companyType} onValueChange={(value) => setCompanyType(value as CompanyType)}>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Selecciona el tipo" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="CLIENT">Cliente (Importador/Exportador)</SelectItem>
+                                                    <SelectItem value="AGENT">Agente de Carga</SelectItem>
+                                                    <SelectItem value="CUSTOMS">Agencia de Aduanas</SelectItem>
+                                                    <SelectItem value="TRANSPORTER">Transportista Terrestre</SelectItem>
+                                                    <SelectItem value="LINE">Línea Naviera/Aérea</SelectItem>
+                                                    <SelectItem value="WAREHOUSE">Almacén (Depósito)</SelectItem>
+                                                    <SelectItem value="OTHER">Otro Proveedor</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
 
-                                <div className="space-y-2">
-                                    <Label htmlFor="tradeRole">Rol Comercial</Label>
-                                    <Select name="tradeRole" defaultValue={initialData?.tradeRole || "NONE"}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Selecciona el rol" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="NONE">Ninguno / No Aplica</SelectItem>
-                                            <SelectItem value="IMPORTER">Importador</SelectItem>
-                                            <SelectItem value="EXPORTER">Exportador</SelectItem>
-                                            <SelectItem value="BOTH">Importador y Exportador</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="tradeRole">Rol Comercial</Label>
+                                            <Select name="tradeRole" defaultValue={initialData?.tradeRole || "NONE"}>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Selecciona el rol" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="NONE">Ninguno / No Aplica</SelectItem>
+                                                    <SelectItem value="IMPORTER">Importador</SelectItem>
+                                                    <SelectItem value="EXPORTER">Exportador</SelectItem>
+                                                    <SelectItem value="BOTH">Importador y Exportador</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </>
+                                )}
                             </div>
 
+                            {!isEditing && (
+                                <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                                    Alta minima recomendada: RUC y Razon Social. Todo lo demas puede enriquecerse despues sin frenar investigacion ni caceria.
+                                </div>
+                            )}
+
+                            {isEditing && (
                             <div className="border-t pt-6 mt-6 !mt-6 space-y-6">
                                 <h3 className="text-lg font-medium">Ubicación</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -245,6 +260,7 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
                                     </div>
                                 </div>
                             </div>
+                            )}
                         </CardContent>
                     </Card>
                 </TabsContent>
@@ -326,6 +342,30 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
                                     />
                                     <p className="text-sm text-muted-foreground">
                                         Anotación manual de cuántos despachos maneja este cliente anualmente aprox.
+                                    </p>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="dominantIncoterm">Incoterm Mas Frecuente</Label>
+                                    <Input
+                                        id="dominantIncoterm"
+                                        name="dominantIncoterm"
+                                        defaultValue={initialData?.dominantIncoterm ?? ""}
+                                        placeholder="Ej. FOB"
+                                    />
+                                    <p className="text-sm text-muted-foreground">
+                                        Pista rapida para investigar y preparar mejor la caceria.
+                                    </p>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="dominantCustomsChannel">Canal Aduanero Mas Frecuente</Label>
+                                    <Input
+                                        id="dominantCustomsChannel"
+                                        name="dominantCustomsChannel"
+                                        defaultValue={initialData?.dominantCustomsChannel ?? ""}
+                                        placeholder="Ej. VERDE"
+                                    />
+                                    <p className="text-sm text-muted-foreground">
+                                        Contexto visual ligero sobre la carga operativa mas habitual.
                                     </p>
                                 </div>
                             </div>

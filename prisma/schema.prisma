@@ -54,6 +54,42 @@ enum ValueDriver {
   UNKNOWN
 }
 
+enum ResearchPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ResearchEffort {
+  LIGHT
+  MEDIUM
+  HEAVY
+}
+
+enum ResearchStatus {
+  NEW
+  RESEARCHING
+  SOURCE_FOUND
+  CONTACT_PENDING_VALIDATION
+  BLOCKED
+  VISIT_REQUIRED
+  ESCALATE_LATER
+}
+
+enum ResearchSourceChannel {
+  GOOGLE
+  WEBSITE
+  WEB
+  LINKEDIN
+  FACEBOOK
+  INSTAGRAM
+  CENTRAL_CALL
+  VISIT
+  INTERNAL_REFERRAL
+  DIRECTORY
+  OTHER
+}
+
 enum ContactCommercialStatus {
   UNVALIDATED
   VALIDATED_NO_RESPONSE
@@ -72,6 +108,37 @@ enum ContactBuyingRole {
   INFLUENCER
   DECISION_MAKER
   BLOCKER
+}
+
+enum RelationshipStrength {
+  COLD
+  WARM
+  TRUSTED
+  ADVOCATE
+}
+
+enum PreferredContactChannel {
+  EMAIL
+  PHONE
+  WHATSAPP
+  LINKEDIN
+  IN_PERSON
+}
+
+enum PreferredContactWindow {
+  EARLY_MORNING
+  MORNING
+  AFTERNOON
+  EVENING
+  FLEXIBLE
+}
+
+enum DecisionStyle {
+  ANALYTICAL
+  DIRECT
+  RELATIONAL
+  CAUTIOUS
+  POLITICAL
 }
 
 /// Representa a la Entidad / Empresa principal
@@ -100,6 +167,16 @@ model Company {
   valueDriver            ValueDriver       @default(UNKNOWN)
   strategyTags           String? /// Ej: 'Sensible al precio', 'Exige Días Libres'
   leadScore              Int               @default(0)
+  dominantIncoterm       String?
+  dominantCustomsChannel String?
+  researchPriority       ResearchPriority  @default(MEDIUM)
+  researchEffort         ResearchEffort    @default(MEDIUM)
+  researchStatus         ResearchStatus    @default(NEW)
+  researchSourceChannel  ResearchSourceChannel?
+  researchLastFinding    String?
+  researchSummary        String?
+  researchNextAction     String?
+  researchLastReviewedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -109,10 +186,42 @@ model Company {
   opportunities Opportunity[]
 }
 
+/// Perfil maestro de persona para conservar relacion aunque cambie de empresa
+model ContactProfile {
+  id           String   @id @default(uuid())
+  firstName    String
+  lastName     String
+  primaryEmail String?
+  linkedin     String?
+
+  birthday    DateTime?
+  anniversary DateTime?
+  interests   String?
+  notes       String?
+
+  relationshipStrength      RelationshipStrength    @default(COLD)
+  preferredContactChannel   PreferredContactChannel?
+  preferredContactWindow    PreferredContactWindow?
+  decisionStyle             DecisionStyle?
+  primaryDriver             ValueDriver             @default(UNKNOWN)
+  typicalObjection          String?
+  giftPreferences           String?
+  doNotGift                 String?
+  visitNotes                String?
+  lastMeaningfulInteractionAt DateTime?
+  nextPersonalTouchAt         DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contacts Contact[]
+}
+
 /// Contactos (Personas) asociadas a una Empresa
 model Contact {
   id        String   @id @default(uuid())
   companyId String
+  profileId String?
   firstName String
   lastName  String
   emails    String[] @default([]) /// Permite guardar N cantidad de correos ("juan@g", "ventas@g")
@@ -131,12 +240,14 @@ model Contact {
   engagementScore Int     @default(0)
   commercialStatus ContactCommercialStatus @default(UNVALIDATED)
   buyingRole      ContactBuyingRole @default(UNKNOWN)
+  sourceChannel   ResearchSourceChannel?
   lastValidatedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  profile      ContactProfile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
   interactions Interaction[]
   opportunities Opportunity[]
 }

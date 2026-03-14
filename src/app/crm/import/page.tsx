@@ -78,6 +78,8 @@ export default function ImportProspectsPage() {
             const annualDamsStr = row["DAMs_Anuales"] || row["DAMs Anuales"] || row["DAMs"];
             const annualDams = annualDamsStr ? parseInt(annualDamsStr, 10) : undefined;
             const legalRepresentative = row["Representante_Legal"] || row["Representante Legal"] || row["Representante"];
+            const dominantIncoterm = row["Incoterm_Frecuente"] || row["Incoterm Frecuente"] || row["Incoterm"] || row["Incoterm_Principal"];
+            const dominantCustomsChannel = row["Canal_Frecuente"] || row["Canal Frecuente"] || row["Canal"] || row["Canal_Principal"];
 
             const newCompany = await upsertCompanyFromImport({
                 businessName,
@@ -88,6 +90,8 @@ export default function ImportProspectsPage() {
                 isActive: true,
                 prospectingStatus: "COLD",
                 annualDams: isNaN(annualDams as number) ? undefined : annualDams,
+                dominantIncoterm,
+                dominantCustomsChannel,
                 legalRepresentative
             });
 

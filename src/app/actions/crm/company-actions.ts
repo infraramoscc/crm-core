@@ -2,8 +2,29 @@
 
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
-import type { CompanyType, ProspectingStatus, ValueDriver, ImportVolume, TradeRole } from "@prisma/client";
+import type {
+    CompanyType,
+    ImportVolume,
+    ProspectingStatus,
+    ResearchEffort,
+    ResearchPriority,
+    ResearchSourceChannel,
+    ResearchStatus,
+    TradeRole,
+    ValueDriver,
+} from "@prisma/client";
 import type { CompanyDetail, CompanyUpdateInput } from "@/lib/crm-list-types";
+
+function hasAnyActiveContact(contact: { isActive: boolean }) {
+    return contact.isActive;
+}
+
+function hasResearchOpinion(company: {
+    researchSummary: string | null;
+    researchLastReviewedAt: Date | null;
+}) {
+    return Boolean(company.researchSummary?.trim()) && Boolean(company.researchLastReviewedAt);
+}
 
 export async function createCompany(data: {
     documentNumber: string;
@@ -15,6 +36,8 @@ export async function createCompany(data: {
     tradeRole?: TradeRole;
     isActive?: boolean;
     annualDams?: number;
+    dominantIncoterm?: string;
+    dominantCustomsChannel?: string;
     prospectingStatus?: ProspectingStatus;
     legalRepresentative?: string;
     importVolume?: ImportVolume;
@@ -33,6 +56,8 @@ export async function createCompany(data: {
                 tradeRole: data.tradeRole || "NONE",
                 isActive: data.isActive ?? true,
                 annualDams: data.annualDams || null,
+                dominantIncoterm: data.dominantIncoterm || null,
+                dominantCustomsChannel: data.dominantCustomsChannel || null,
                 prospectingStatus: data.prospectingStatus || "COLD",
                 legalRepresentative: data.legalRepresentative || null,
                 importVolume: data.importVolume || "NEW",
@@ -62,6 +87,8 @@ export async function upsertCompanyFromImport(data: {
     companyType?: CompanyType;
     isActive?: boolean;
     annualDams?: number;
+    dominantIncoterm?: string;
+    dominantCustomsChannel?: string;
     prospectingStatus?: ProspectingStatus;
     legalRepresentative?: string;
     tradeRole?: TradeRole;
@@ -75,11 +102,12 @@ export async function upsertCompanyFromImport(data: {
                 documentNumber: data.documentNumber,
             },
             update: {
-                // Actualizamos nombre, etc. Cuidado de no sobreescribir con nulos si ya existen
                 businessName: data.businessName,
                 ...(data.tradeName && { tradeName: data.tradeName }),
                 ...(data.website && { website: data.website }),
                 ...(data.annualDams && { annualDams: data.annualDams }),
+                ...(data.dominantIncoterm && { dominantIncoterm: data.dominantIncoterm }),
+                ...(data.dominantCustomsChannel && { dominantCustomsChannel: data.dominantCustomsChannel }),
                 ...(data.legalRepresentative && { legalRepresentative: data.legalRepresentative }),
                 ...(data.tradeRole && { tradeRole: data.tradeRole }),
                 ...(data.importVolume && { importVolume: data.importVolume }),
@@ -96,6 +124,8 @@ export async function upsertCompanyFromImport(data: {
                 tradeRole: data.tradeRole || "NONE",
                 isActive: data.isActive ?? true,
                 annualDams: data.annualDams || null,
+                dominantIncoterm: data.dominantIncoterm || null,
+                dominantCustomsChannel: data.dominantCustomsChannel || null,
                 prospectingStatus: data.prospectingStatus || "COLD",
                 legalRepresentative: data.legalRepresentative || null,
                 importVolume: data.importVolume || "NEW",
@@ -128,8 +158,17 @@ export async function getCompaniesByStatus(statuses: ProspectingStatus[]) {
                 id: true,
                 documentNumber: true,
                 businessName: true,
+                website: true,
                 tradeRole: true,
                 annualDams: true,
+                dominantIncoterm: true,
+                dominantCustomsChannel: true,
+                researchPriority: true,
+                researchEffort: true,
+                researchStatus: true,
+                researchSummary: true,
+                researchNextAction: true,
+                researchLastReviewedAt: true,
                 importVolume: true,
                 valueDriver: true,
                 leadScore: true,
@@ -138,16 +177,19 @@ export async function getCompaniesByStatus(statuses: ProspectingStatus[]) {
                         id: true,
                         firstName: true,
                         lastName: true,
+                        isActive: true,
+                        position: true,
                         phones: true,
                         emails: true,
                         linkedin: true,
                         commercialStatus: true,
                         buyingRole: true,
+                        sourceChannel: true,
                         lastValidatedAt: true,
                     }
                 },
                 interactions: {
-                    orderBy: { interactedAt: 'desc' },
+                    orderBy: { interactedAt: "desc" },
                     select: {
                         id: true,
                         type: true,
@@ -165,51 +207,77 @@ export async function getCompaniesByStatus(statuses: ProspectingStatus[]) {
                     select: { id: true }
                 }
             },
-            orderBy: {
-                createdAt: 'desc'
-            }
+            orderBy: [
+                { annualDams: "desc" },
+                { createdAt: "desc" }
+            ]
         });
-        return { success: true, data: companies };
+
+        const readyCompanies = companies.filter((company) =>
+            company.contacts.some((contact) => hasAnyActiveContact(contact)) && hasResearchOpinion(company)
+        );
+
+        return { success: true, data: readyCompanies };
     } catch (error) {
         console.error("Error fetching companies:", error);
         return { success: false, error: "Failed to fetch companies", data: [] };
     }
 }
 
-// NUEVA FUNCIÓN OPTIMIZADA (Ahorro de recursos en Supabase/Vercel)
 export async function getCompaniesForInvestigation() {
     try {
         const companies = await prisma.company.findMany({
             where: {
-                prospectingStatus: "COLD",
-                opportunities: { none: {} }, // Que no tenga negocios abiertos
-                OR: [
-                    { contacts: { none: {} } }, // Que no tenga NINGÚN contacto
-                    { contacts: { every: { isActive: false } } } // O que TODOS sus contactos estén inactivos
-                ]
+                prospectingStatus: {
+                    in: ["COLD", "PROSPECTING"]
+                },
+                opportunities: { none: {} },
             },
             select: {
-                // Solo traemos lo que la UI de Investigación necesita, ahorrando KBs
                 id: true,
                 businessName: true,
+                website: true,
                 documentType: true,
                 documentNumber: true,
                 annualDams: true,
+                dominantIncoterm: true,
+                dominantCustomsChannel: true,
+                researchPriority: true,
+                researchEffort: true,
+                researchStatus: true,
+                researchSourceChannel: true,
+                researchLastFinding: true,
+                researchSummary: true,
+                researchNextAction: true,
+                researchLastReviewedAt: true,
+                createdAt: true,
                 contacts: {
                     select: {
                         id: true,
                         firstName: true,
                         lastName: true,
+                        position: true,
+                        emails: true,
+                        phones: true,
+                        linkedin: true,
+                        buyingRole: true,
+                        sourceChannel: true,
                         isActive: true,
                         inactiveReason: true
                     }
                 }
             },
-            orderBy: {
-                createdAt: 'desc'
-            }
+            orderBy: [
+                { annualDams: "desc" },
+                { createdAt: "desc" }
+            ]
         });
-        return { success: true, data: companies };
+
+        const investigationQueue = companies.filter((company) =>
+            !(company.contacts.some((contact) => hasAnyActiveContact(contact)) && hasResearchOpinion(company))
+        );
+
+        return { success: true, data: investigationQueue };
     } catch (error) {
         console.error("Error fetching investigation companies:", error);
         return { success: false, error: "Failed to fetch investigation companies", data: [] };
@@ -252,6 +320,51 @@ export async function updateCompanyStatus(
     }
 }
 
+export async function updateInvestigationOpinion(data: {
+    companyId: string;
+    researchPriority: ResearchPriority;
+    researchEffort: ResearchEffort;
+    researchStatus: ResearchStatus;
+    researchSourceChannel?: ResearchSourceChannel;
+    researchLastFinding?: string;
+    researchSummary?: string;
+    researchNextAction?: string;
+}) {
+    try {
+        const company = await prisma.company.update({
+            where: { id: data.companyId },
+            data: {
+                researchPriority: data.researchPriority,
+                researchEffort: data.researchEffort,
+                researchStatus: data.researchStatus,
+                researchSourceChannel: data.researchSourceChannel || null,
+                researchLastFinding: data.researchLastFinding || null,
+                researchSummary: data.researchSummary || null,
+                researchNextAction: data.researchNextAction || null,
+                researchLastReviewedAt: new Date(),
+            },
+            select: {
+                id: true,
+                researchPriority: true,
+                researchEffort: true,
+                researchStatus: true,
+                researchSourceChannel: true,
+                researchLastFinding: true,
+                researchSummary: true,
+                researchNextAction: true,
+                researchLastReviewedAt: true,
+            },
+        });
+
+        revalidatePath("/crm/investigation");
+        revalidatePath(`/companies/${data.companyId}`);
+        return { success: true, data: company };
+    } catch (error) {
+        console.error("Error updating investigation opinion:", error);
+        return { success: false, error: "Failed to update investigation opinion" };
+    }
+}
+
 export async function getAllCompanies() {
     try {
         const companies = await prisma.company.findMany({
@@ -262,11 +375,39 @@ export async function getAllCompanies() {
                 documentType: true,
                 documentNumber: true,
                 companyType: true,
+                tradeRole: true,
+                website: true,
                 city: true,
                 countryCode: true,
-                isActive: true
+                isActive: true,
+                prospectingStatus: true,
+                dominantIncoterm: true,
+                dominantCustomsChannel: true,
+                researchLastReviewedAt: true,
+                createdAt: true,
+                contacts: {
+                    select: {
+                        id: true,
+                        isActive: true,
+                    },
+                },
+                opportunities: {
+                    select: {
+                        id: true,
+                    },
+                },
+                interactions: {
+                    orderBy: {
+                        interactedAt: "desc",
+                    },
+                    take: 1,
+                    select: {
+                        id: true,
+                        interactedAt: true,
+                    },
+                },
             },
-            orderBy: { createdAt: 'desc' }
+            orderBy: { createdAt: "desc" }
         });
         return { success: true, data: companies };
     } catch (error) {
@@ -315,9 +456,19 @@ export async function updateCompany(id: string, data: CompanyUpdateInput) {
                 tradeRole: data.tradeRole,
                 isActive: data.isActive,
                 annualDams: data.annualDams,
+                dominantIncoterm: data.dominantIncoterm,
+                dominantCustomsChannel: data.dominantCustomsChannel,
                 importVolume: data.importVolume,
                 valueDriver: data.valueDriver,
                 strategyTags: data.strategyTags,
+                researchPriority: data.researchPriority,
+                researchEffort: data.researchEffort,
+                researchStatus: data.researchStatus,
+                researchSourceChannel: data.researchSourceChannel,
+                researchLastFinding: data.researchLastFinding,
+                researchSummary: data.researchSummary,
+                researchNextAction: data.researchNextAction,
+                researchLastReviewedAt: data.researchLastReviewedAt ? new Date(data.researchLastReviewedAt) : undefined,
                 prospectingStatus: data.prospectingStatus,
                 legalRepresentative: data.legalRepresentative,
                 address: data.address,
