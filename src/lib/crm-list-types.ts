@@ -180,6 +180,9 @@ export interface ProspectingCompanyItem {
     annualDams: number | null;
     importVolume: ImportVolume;
     valueDriver: ValueDriver;
+    researchSummary: string | null;
+    researchNextAction: string | null;
+    researchLastReviewedAt: Date | null;
     leadScore: number;
     contacts: ProspectingContactItem[];
     interactions: ProspectingInteractionItem[];

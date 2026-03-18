@@ -11,13 +11,10 @@ import { Label } from "@/components/ui/label";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 
-type AuthMode = "sign-in" | "sign-up";
-
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirectTo") || "/";
-  const [mode, setMode] = useState<AuthMode>("sign-in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -37,32 +34,9 @@ export default function LoginPage() {
 
     try {
       const supabase = createSupabaseBrowserClient();
-
-      if (mode === "sign-in") {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (error) {
-          setFeedback(error.message);
-          return;
-        }
-
-        router.push(redirectTo);
-        router.refresh();
-        return;
-      }
-
-      const emailRedirectTo =
-        typeof window !== "undefined" ? `${window.location.origin}/login` : undefined;
-
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
-        options: {
-          emailRedirectTo,
-        },
       });
 
       if (error) {
@@ -70,13 +44,8 @@ export default function LoginPage() {
         return;
       }
 
-      if (data.session) {
-        router.push(redirectTo);
-        router.refresh();
-        return;
-      }
-
-      setFeedback("Cuenta creada. Revisa tu correo para confirmar el acceso antes de entrar.");
+      router.push(redirectTo);
+      router.refresh();
     } finally {
       setIsSubmitting(false);
     }
@@ -93,32 +62,8 @@ export default function LoginPage() {
             </div>
             <div>
               <CardTitle>CargoERP</CardTitle>
-              <CardDescription>Autenticacion con Supabase para el CRM.</CardDescription>
+              <CardDescription>Acceso privado al CRM con Supabase.</CardDescription>
             </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1">
-            <Button
-              type="button"
-              variant={mode === "sign-in" ? "default" : "ghost"}
-              className="w-full"
-              onClick={() => {
-                setMode("sign-in");
-                setFeedback(null);
-              }}
-            >
-              Iniciar sesion
-            </Button>
-            <Button
-              type="button"
-              variant={mode === "sign-up" ? "default" : "ghost"}
-              className="w-full"
-              onClick={() => {
-                setMode("sign-up");
-                setFeedback(null);
-              }}
-            >
-              Crear cuenta
-            </Button>
           </div>
         </CardHeader>
 
@@ -142,8 +87,8 @@ export default function LoginPage() {
               <Input
                 id="password"
                 type="password"
-                autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
-                placeholder="Minimo 6 caracteres"
+                autoComplete="current-password"
+                placeholder="Tu contrasena"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 minLength={6}
@@ -165,12 +110,12 @@ export default function LoginPage() {
 
             <Button type="submit" className="w-full" disabled={isSubmitting || !config}>
               {isSubmitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
-              {mode === "sign-in" ? "Entrar al CRM" : "Crear acceso"}
+              Entrar al CRM
             </Button>
           </form>
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
-            Si activas confirmacion por correo en Supabase, el usuario nuevo tendra que validar su email antes de entrar.
+            El registro publico esta deshabilitado. Si necesitas acceso, un administrador debe crear o invitar tu usuario.
           </p>
 
           <p className="mt-3 text-center text-xs text-muted-foreground">
