@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { UserButton } from "@clerk/nextjs";
 import { Anchor, Menu, Search } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { Input } from "@/components/ui/input";
@@ -16,9 +15,28 @@ import {
 import { cn } from "@/lib/utils";
 import { TaskNotificationsBell } from "./TaskNotificationsBell";
 import { useScopedSearch } from "./SearchProvider";
+import { SupabaseUserMenu } from "./SupabaseUserMenu";
 import { navItems } from "./navigation";
 
-export function Topbar() {
+type TopbarProps = {
+  userEmail?: string | null;
+};
+
+function formatUserLabel(userEmail?: string | null) {
+  if (!userEmail) {
+    return "Sesion activa";
+  }
+
+  const base = userEmail.split("@")[0] ?? userEmail;
+
+  return base
+    .split(/[._-]/)
+    .filter(Boolean)
+    .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+export function Topbar({ userEmail }: TopbarProps) {
   const pathname = usePathname();
   const { query, setQuery } = useScopedSearch();
   const mainItems = navItems.filter((item) => item.section !== "secondary");
@@ -109,10 +127,10 @@ export function Topbar() {
           <TaskNotificationsBell />
           <div className="flex items-center gap-2 border-l pl-2 md:pl-4">
             <div className="hidden text-right sm:flex sm:flex-col">
-              <span className="text-sm font-medium leading-none">Operador A.</span>
-              <span className="mt-1 text-xs text-muted-foreground">Agencia de Carga</span>
+              <span className="text-sm font-medium leading-none">{formatUserLabel(userEmail)}</span>
+              <span className="mt-1 text-xs text-muted-foreground">{userEmail ?? "Supabase Auth"}</span>
             </div>
-            <UserButton />
+            <SupabaseUserMenu userEmail={userEmail} />
           </div>
         </div>
       </div>
