@@ -18,23 +18,10 @@ import type {
     ValueDriver,
 } from "@prisma/client";
 import type { CompanyDetail, CompanyUpdateInput } from "@/lib/crm-list-types";
+import { buildCommercialOpinionNote } from "@/lib/crm-interaction-labels";
 
 function hasAnyActiveContact(contact: { isActive: boolean }) {
     return contact.isActive;
-}
-
-function buildCommercialOpinionNote(data: {
-    researchSummary?: string;
-    researchLastFinding?: string;
-    researchNextAction?: string;
-}) {
-    return [
-        data.researchSummary?.trim() ? `Opinion comercial: ${data.researchSummary.trim()}` : null,
-        data.researchLastFinding?.trim() ? `Hallazgo: ${data.researchLastFinding.trim()}` : null,
-        data.researchNextAction?.trim() ? `Siguiente accion: ${data.researchNextAction.trim()}` : null,
-    ]
-        .filter(Boolean)
-        .join("\n");
 }
 
 export async function createCompany(data: {

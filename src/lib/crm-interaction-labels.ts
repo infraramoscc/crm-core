@@ -4,6 +4,22 @@ type InteractionLike = {
     notes?: string | null;
 };
 
+type CommercialOpinionLike = {
+    researchSummary?: string | null;
+    researchLastFinding?: string | null;
+    researchNextAction?: string | null;
+};
+
+export function buildCommercialOpinionNote(data: CommercialOpinionLike) {
+    return [
+        data.researchSummary?.trim() ? `Opinion comercial: ${data.researchSummary.trim()}` : null,
+        data.researchLastFinding?.trim() ? `Hallazgo: ${data.researchLastFinding.trim()}` : null,
+        data.researchNextAction?.trim() ? `Siguiente accion: ${data.researchNextAction.trim()}` : null,
+    ]
+        .filter(Boolean)
+        .join("\n");
+}
+
 export function isCommercialOpinionInteraction(interaction: InteractionLike) {
     return interaction.type === "SYSTEM_NOTE"
         && (

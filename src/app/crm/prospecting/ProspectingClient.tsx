@@ -33,7 +33,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getInteractionDisplayLabel } from "@/lib/crm-interaction-labels";
+import { buildCommercialOpinionNote, getInteractionDisplayLabel, isCommercialOpinionInteraction } from "@/lib/crm-interaction-labels";
 import { matchesSearch } from "@/lib/search";
 
 const ITEMS_PER_PAGE = 10;
@@ -152,8 +152,50 @@ function sortInteractions(items: ProspectingInteractionItem[]) {
   return [...items].sort((a, b) => (toDate(b.interactedAt)?.getTime() ?? 0) - (toDate(a.interactedAt)?.getTime() ?? 0));
 }
 
+function getCommercialOpinionInteraction(company: ProspectingCompanyItem): ProspectingInteractionItem | null {
+  if (!company.researchSummary?.trim() || !company.researchLastReviewedAt) {
+    return null;
+  }
+
+  if (company.interactions.some(isCommercialOpinionInteraction)) {
+    return null;
+  }
+
+  const note = buildCommercialOpinionNote({
+    researchSummary: company.researchSummary,
+    researchLastFinding: company.researchLastFinding,
+    researchNextAction: company.researchNextAction,
+  });
+
+  if (!note) {
+    return null;
+  }
+
+  return {
+    id: `commercial-opinion-${company.id}`,
+    type: "SYSTEM_NOTE",
+    stageContext: "INVESTIGATION",
+    direction: "INTERNAL",
+    purpose: "RESEARCH",
+    outcome: null,
+    interactedAt: company.researchLastReviewedAt,
+    scoreImpact: 0,
+    notes: note,
+    nextFollowUpDate: null,
+    isFollowUpCompleted: true,
+    contactId: null,
+    followUpType: null,
+    contact: null,
+  };
+}
+
+function getTimelineInteractions(company: ProspectingCompanyItem) {
+  const syntheticOpinion = getCommercialOpinionInteraction(company);
+  return sortInteractions(syntheticOpinion ? [syntheticOpinion, ...company.interactions] : company.interactions);
+}
+
 function getView(company: ProspectingCompanyItem, today: string): ProspectingCompanyView {
-  const allInteractions = sortInteractions(company.interactions);
+  const allInteractions = getTimelineInteractions(company);
   const lastInteraction = allInteractions[0] ?? null;
   const nextTask = allInteractions
     .filter((item) => item.nextFollowUpDate && !item.isFollowUpCompleted)
