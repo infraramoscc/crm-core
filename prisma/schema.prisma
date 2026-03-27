@@ -184,6 +184,9 @@ model Company {
   contacts      Contact[]
   interactions  Interaction[]
   opportunities Opportunity[]
+
+  @@index([prospectingStatus, annualDams, createdAt])
+  @@index([researchStatus, createdAt])
 }
 
 /// Perfil maestro de persona para conservar relacion aunque cambie de empresa
@@ -250,6 +253,10 @@ model Contact {
   profile      ContactProfile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
   interactions Interaction[]
   opportunities Opportunity[]
+
+  @@index([companyId, isActive])
+  @@index([companyId, commercialStatus])
+  @@index([profileId])
 }
 
 /// Tipos de puertos / ubicaciones
@@ -404,6 +411,12 @@ model Interaction {
   company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
   contact     Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
   opportunity Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, interactedAt])
+  @@index([companyId, isFollowUpCompleted, nextFollowUpDate])
+  @@index([contactId])
+  @@index([opportunityId])
+  @@index([outcome, interactedAt])
 }
 
 enum OpportunityStage {
@@ -468,6 +481,11 @@ model Opportunity {
   contact      Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
   quotes       Quote[]
   interactions Interaction[]
+
+  @@index([companyId, stage])
+  @@index([contactId])
+  @@index([stage, updatedAt])
+  @@index([stage, externalQuoteRef])
 }
 
 enum QuoteStatus {
@@ -490,6 +508,8 @@ model Quote {
 
   opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
   items       QuoteItem[]
+
+  @@index([opportunityId])
 }
 
 /// Detalle de la cotización vinculado a los Servicios base
@@ -506,4 +526,7 @@ model QuoteItem {
 
   quote   Quote   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
   service Service @relation(fields: [serviceId], references: [id])
+
+  @@index([quoteId])
+  @@index([serviceId])
 }

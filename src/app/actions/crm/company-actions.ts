@@ -5,6 +5,10 @@ import prisma from "@/lib/prisma";
 import type {
     CompanyType,
     ImportVolume,
+    InteractionDirection,
+    InteractionPurpose,
+    InteractionStageContext,
+    InteractionType,
     ProspectingStatus,
     ResearchEffort,
     ResearchPriority,
@@ -19,11 +23,18 @@ function hasAnyActiveContact(contact: { isActive: boolean }) {
     return contact.isActive;
 }
 
-function hasResearchOpinion(company: {
-    researchSummary: string | null;
-    researchLastReviewedAt: Date | null;
+function buildCommercialOpinionNote(data: {
+    researchSummary?: string;
+    researchLastFinding?: string;
+    researchNextAction?: string;
 }) {
-    return Boolean(company.researchSummary?.trim()) && Boolean(company.researchLastReviewedAt);
+    return [
+        data.researchSummary?.trim() ? `Opinion comercial: ${data.researchSummary.trim()}` : null,
+        data.researchLastFinding?.trim() ? `Hallazgo: ${data.researchLastFinding.trim()}` : null,
+        data.researchNextAction?.trim() ? `Siguiente accion: ${data.researchNextAction.trim()}` : null,
+    ]
+        .filter(Boolean)
+        .join("\n");
 }
 
 export async function createCompany(data: {
@@ -166,6 +177,8 @@ export async function getCompaniesByStatus(statuses: ProspectingStatus[]) {
                 researchPriority: true,
                 researchEffort: true,
                 researchStatus: true,
+                researchSourceChannel: true,
+                researchLastFinding: true,
                 researchSummary: true,
                 researchNextAction: true,
                 researchLastReviewedAt: true,
@@ -217,7 +230,7 @@ export async function getCompaniesByStatus(statuses: ProspectingStatus[]) {
         });
 
         const readyCompanies = companies.filter((company) =>
-            company.contacts.some((contact) => hasAnyActiveContact(contact)) && hasResearchOpinion(company)
+            company.contacts.some((contact) => hasAnyActiveContact(contact))
         );
 
         return { success: true, data: readyCompanies };
@@ -277,7 +290,7 @@ export async function getCompaniesForInvestigation() {
         });
 
         const investigationQueue = companies.filter((company) =>
-            !(company.contacts.some((contact) => hasAnyActiveContact(contact)) && hasResearchOpinion(company))
+            !company.contacts.some((contact) => hasAnyActiveContact(contact))
         );
 
         return { success: true, data: investigationQueue };
@@ -325,6 +338,7 @@ export async function updateCompanyStatus(
 
 export async function updateInvestigationOpinion(data: {
     companyId: string;
+    stageContext?: InteractionStageContext;
     researchPriority: ResearchPriority;
     researchEffort: ResearchEffort;
     researchStatus: ResearchStatus;
@@ -334,34 +348,74 @@ export async function updateInvestigationOpinion(data: {
     researchNextAction?: string;
 }) {
     try {
-        const company = await prisma.company.update({
-            where: { id: data.companyId },
-            data: {
-                researchPriority: data.researchPriority,
-                researchEffort: data.researchEffort,
-                researchStatus: data.researchStatus,
-                researchSourceChannel: data.researchSourceChannel || null,
-                researchLastFinding: data.researchLastFinding || null,
-                researchSummary: data.researchSummary || null,
-                researchNextAction: data.researchNextAction || null,
-                researchLastReviewedAt: new Date(),
-            },
-            select: {
-                id: true,
-                researchPriority: true,
-                researchEffort: true,
-                researchStatus: true,
-                researchSourceChannel: true,
-                researchLastFinding: true,
-                researchSummary: true,
-                researchNextAction: true,
-                researchLastReviewedAt: true,
-            },
+        const stageContext: InteractionStageContext = data.stageContext || "INVESTIGATION";
+        const note = buildCommercialOpinionNote(data);
+
+        const { company, interaction } = await prisma.$transaction(async (tx) => {
+            const company = await tx.company.update({
+                where: { id: data.companyId },
+                data: {
+                    researchPriority: data.researchPriority,
+                    researchEffort: data.researchEffort,
+                    researchStatus: data.researchStatus,
+                    researchSourceChannel: data.researchSourceChannel || null,
+                    researchLastFinding: data.researchLastFinding || null,
+                    researchSummary: data.researchSummary || null,
+                    researchNextAction: data.researchNextAction || null,
+                    researchLastReviewedAt: new Date(),
+                },
+                select: {
+                    id: true,
+                    researchPriority: true,
+                    researchEffort: true,
+                    researchStatus: true,
+                    researchSourceChannel: true,
+                    researchLastFinding: true,
+                    researchSummary: true,
+                    researchNextAction: true,
+                    researchLastReviewedAt: true,
+                },
+            });
+
+            const interaction = note
+                ? await tx.interaction.create({
+                    data: {
+                        companyId: data.companyId,
+                        type: "SYSTEM_NOTE" as InteractionType,
+                        stageContext,
+                        direction: "INTERNAL" as InteractionDirection,
+                        purpose: (stageContext === "INVESTIGATION" ? "RESEARCH" : "DISCOVERY") as InteractionPurpose,
+                        notes: note,
+                        scoreImpact: 0,
+                        interactedAt: new Date(),
+                        isFollowUpCompleted: true,
+                    },
+                    select: {
+                        id: true,
+                        type: true,
+                        stageContext: true,
+                        direction: true,
+                        purpose: true,
+                        outcome: true,
+                        interactedAt: true,
+                        scoreImpact: true,
+                        notes: true,
+                        nextFollowUpDate: true,
+                        isFollowUpCompleted: true,
+                        contactId: true,
+                        followUpType: true,
+                    },
+                })
+                : null;
+
+            return { company, interaction };
         });
 
         revalidatePath("/crm/investigation");
+        revalidatePath("/crm/prospecting");
+        revalidatePath("/crm");
         revalidatePath(`/companies/${data.companyId}`);
-        return { success: true, data: company };
+        return { success: true, data: { ...company, interaction } };
     } catch (error) {
         console.error("Error updating investigation opinion:", error);
         return { success: false, error: "Failed to update investigation opinion" };

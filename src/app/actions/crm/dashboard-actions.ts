@@ -246,8 +246,8 @@ function buildFocusReadout(data: {
 
     if (data.investigationWithContactsNoOpinion > 0) {
         insights.push({
-            title: "Investigacion no esta cerrando criterio",
-            detail: `${data.investigationWithContactsNoOpinion} cuenta(s) ya tienen contacto pero no opinion comercial. Ese trabajo aun no produce prioridad real para caceria.`,
+            title: "Caceria sin criterio registrado",
+            detail: `${data.investigationWithContactsNoOpinion} cuenta(s) ya estan en caceria con contacto activo pero todavia sin opinion comercial registrada en el timeline.`,
         });
     }
 
@@ -401,6 +401,9 @@ export async function getDashboardSnapshot() {
             }),
             prisma.company.count({
                 where: {
+                    prospectingStatus: {
+                        in: ["COLD", "PROSPECTING"],
+                    },
                     opportunities: { none: {} },
                     contacts: {
                         some: {

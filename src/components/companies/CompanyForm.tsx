@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Plus, Mail, Phone, User, MessageSquareText, PhoneCall, Calendar } from "lucide-react";
 import { createCompany, updateCompany } from "@/app/actions/crm/company-actions";
 import type { CompanyDetail, CompanyUpdateInput } from "@/lib/crm-list-types";
+import { getInteractionDisplayLabel, isCommercialOpinionInteraction } from "@/lib/crm-interaction-labels";
 import type { CompanyType, ImportVolume, TradeRole, ValueDriver } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -471,6 +472,8 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
                                                 }
                                             };
 
+                                            void getLabel;
+
                                             return (
                                                 <div key={interaction.id} className="relative pl-6 group">
                                                     {/* Timeline Node */}
@@ -483,12 +486,17 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
                                                     <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 p-4 rounded-lg border bg-card/50 hover:bg-card transition-colors">
                                                         <div className="space-y-2 flex-1">
                                                             <div className="flex items-center gap-2 flex-wrap">
-                                                                <span className="font-semibold text-sm">{getLabel(interaction.type)}</span>
+                                                                <span className="font-semibold text-sm">{getInteractionDisplayLabel(interaction)}</span>
                                                                 <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
                                                                     {new Date(interaction.interactedAt).toLocaleDateString('es-PE', {
                                                                         weekday: 'long', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
                                                                     })}
                                                                 </span>
+                                                                {isCommercialOpinionInteraction(interaction) && (
+                                                                    <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
+                                                                        Criterio comercial
+                                                                    </span>
+                                                                )}
                                                                 {interaction.scoreImpact > 0 && (
                                                                     <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
                                                                         +{interaction.scoreImpact} termómetro

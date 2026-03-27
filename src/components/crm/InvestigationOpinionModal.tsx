@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
-import type { ResearchEffort, ResearchPriority, ResearchSourceChannel, ResearchStatus } from "@prisma/client";
+import { useState, type ReactNode } from "react";
+import type { InteractionStageContext, ResearchEffort, ResearchPriority, ResearchSourceChannel, ResearchStatus } from "@prisma/client";
 import { updateInvestigationOpinion } from "@/app/actions/crm/company-actions";
+import type { ProspectingInteractionItem } from "@/lib/crm-list-types";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -26,6 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 interface InvestigationOpinionModalProps {
     companyId: string;
     companyName: string;
+    stageContext?: InteractionStageContext;
     initialPriority: ResearchPriority;
     initialEffort: ResearchEffort;
     initialStatus: ResearchStatus;
@@ -43,12 +45,14 @@ interface InvestigationOpinionModalProps {
         researchSummary: string | null;
         researchNextAction: string | null;
         researchLastReviewedAt: Date;
+        interaction?: ProspectingInteractionItem;
     }) => void;
 }
 
 export function InvestigationOpinionModal({
     companyId,
     companyName,
+    stageContext = "INVESTIGATION",
     initialPriority,
     initialEffort,
     initialStatus,
@@ -69,27 +73,26 @@ export function InvestigationOpinionModal({
     const [researchNextAction, setResearchNextAction] = useState(initialNextAction ?? "");
     const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
-        if (!open) {
-            setResearchPriority(initialPriority);
-            setResearchEffort(initialEffort);
-            setResearchStatus(initialStatus);
-            setResearchSourceChannel(initialSourceChannel ?? "");
-            setResearchLastFinding(initialLastFinding ?? "");
-            setResearchSummary(initialSummary ?? "");
-            setResearchNextAction(initialNextAction ?? "");
-        }
-    }, [initialEffort, initialLastFinding, initialNextAction, initialPriority, initialSourceChannel, initialStatus, initialSummary, open]);
+    const resetForm = () => {
+        setResearchPriority(initialPriority);
+        setResearchEffort(initialEffort);
+        setResearchStatus(initialStatus);
+        setResearchSourceChannel(initialSourceChannel ?? "");
+        setResearchLastFinding(initialLastFinding ?? "");
+        setResearchSummary(initialSummary ?? "");
+        setResearchNextAction(initialNextAction ?? "");
+    };
 
     const handleSave = async () => {
         if (!researchSummary.trim()) {
-            alert("La opinion comercial es obligatoria para cerrar esta revision de investigacion.");
+            alert("La opinion comercial no puede quedar vacia.");
             return;
         }
 
         setLoading(true);
         const result = await updateInvestigationOpinion({
             companyId,
+            stageContext,
             researchPriority,
             researchEffort,
             researchStatus,
@@ -101,33 +104,52 @@ export function InvestigationOpinionModal({
         setLoading(false);
 
         if (!result.success || !result.data) {
-            alert("No se pudo guardar la opinion de investigacion.");
+            alert("No se pudo guardar la opinion comercial.");
             return;
         }
 
         onSuccess?.({
-            researchPriority,
-            researchEffort,
-            researchStatus,
-            researchSourceChannel: researchSourceChannel || null,
-            researchLastFinding: researchLastFinding || null,
-            researchSummary: researchSummary || null,
-            researchNextAction: researchNextAction || null,
+            researchPriority: result.data.researchPriority,
+            researchEffort: result.data.researchEffort,
+            researchStatus: result.data.researchStatus,
+            researchSourceChannel: result.data.researchSourceChannel,
+            researchLastFinding: result.data.researchLastFinding,
+            researchSummary: result.data.researchSummary,
+            researchNextAction: result.data.researchNextAction,
             researchLastReviewedAt: result.data.researchLastReviewedAt
                 ? new Date(result.data.researchLastReviewedAt)
                 : new Date(),
+            interaction: result.data.interaction
+                ? {
+                    ...result.data.interaction,
+                    contact: null,
+                }
+                : undefined,
         });
         setOpen(false);
     };
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog
+            open={open}
+            onOpenChange={(nextOpen) => {
+                if (nextOpen) {
+                    resetForm();
+                }
+                if (!nextOpen) {
+                    setLoading(false);
+                }
+                setOpen(nextOpen);
+            }}
+        >
             <DialogTrigger asChild>{triggerButton}</DialogTrigger>
             <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[560px]">
                 <DialogHeader>
-                    <DialogTitle>Opinion de Investigacion</DialogTitle>
+                    <DialogTitle>Opinion Comercial</DialogTitle>
                     <DialogDescription>
-                        Resume lo encontrado en la base de importaciones y define si <strong>{companyName}</strong> merece prioridad en caceria.
+                        {stageContext === "INVESTIGATION"
+                            ? <>Resume lo encontrado en investigacion para <strong>{companyName}</strong>. Si ya existe contacto, la cuenta puede pasar a caceria incluso sin esta opinion.</>
+                            : <>Registra o actualiza la lectura comercial de <strong>{companyName}</strong> desde caceria. Cada guardado quedara asentado en el timeline.</>}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -225,9 +247,15 @@ export function InvestigationOpinionModal({
                 </div>
 
                 <DialogFooter>
-                    <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+                    <Button variant="outline" onClick={() => {
+                        resetForm();
+                        setOpen(false);
+                    }}
+                    >
+                        Cancelar
+                    </Button>
                     <Button onClick={handleSave} disabled={loading}>
-                        {loading ? "Guardando..." : "Guardar criterio"}
+                        {loading ? "Guardando..." : "Guardar opinion"}
                     </Button>
                 </DialogFooter>
             </DialogContent>

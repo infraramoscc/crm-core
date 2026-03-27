@@ -66,8 +66,6 @@ export default function ImportProspectsPage() {
         setStep("IMPORTING");
 
         // Simulación de progreso visual mientras se sube
-        let currentProgress = 0;
-        let successCount = 0;
 
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
@@ -118,7 +116,6 @@ export default function ImportProspectsPage() {
                 });
             }
 
-            successCount++;
             setProgress(Math.round(((i + 1) / data.length) * 100));
         }
 
@@ -157,7 +154,7 @@ export default function ImportProspectsPage() {
                                 {isDragActive ? "Suelta el archivo aquí..." : "Haz clic o arrastra un archivo CSV"}
                             </p>
                             <p className="text-sm text-muted-foreground mt-2">
-                                Columnas Req: "RUC", "Razon_Social". Opcionales: "DAMs_Anuales", "Representante_Legal", "Email_Contacto"...
+                                Columnas Req: &quot;RUC&quot;, &quot;Razon_Social&quot;. Opcionales: &quot;DAMs_Anuales&quot;, &quot;Representante_Legal&quot;, &quot;Email_Contacto&quot;...
                             </p>
 
                             <div className="mt-4 flex flex-col items-center gap-4">

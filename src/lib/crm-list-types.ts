@@ -180,6 +180,11 @@ export interface ProspectingCompanyItem {
     annualDams: number | null;
     importVolume: ImportVolume;
     valueDriver: ValueDriver;
+    researchPriority: ResearchPriority;
+    researchEffort: ResearchEffort;
+    researchStatus: ResearchStatus;
+    researchSourceChannel: ResearchSourceChannel | null;
+    researchLastFinding: string | null;
     researchSummary: string | null;
     researchNextAction: string | null;
     researchLastReviewedAt: Date | null;

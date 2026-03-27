@@ -173,10 +173,10 @@ export default async function DashboardPage() {
             <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
               <div className="flex items-center gap-2 text-violet-900">
                 <FileSearch className="h-4 w-4" />
-                <p className="font-semibold">Investigacion con contacto sin opinion</p>
+                <p className="font-semibold">Caceria sin opinion</p>
               </div>
               <p className="mt-2 text-2xl font-bold text-violet-950">{dashboard.leaks.investigationWithContactsNoOpinion}</p>
-              <p className="mt-1 text-sm text-violet-900">Trabajo que ya encontro contacto, pero aun no genero criterio comercial.</p>
+              <p className="mt-1 text-sm text-violet-900">Cuentas activas con contacto, pero todavia sin criterio comercial registrado.</p>
             </div>
             <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
               <div className="flex items-center gap-2 text-rose-900">

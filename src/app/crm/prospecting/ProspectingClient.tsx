@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useDeferredValue, useMemo, useOptimistic, useState } from "react";
 import {
   AlertCircle,
   Building2,
@@ -25,6 +25,7 @@ import type { ProspectingCompanyItem, ProspectingCompanyView, ProspectingContact
 import { deleteContactInfo } from "@/app/actions/crm/contact-actions";
 import { CreateTaskModal, type CreateTaskSuccessPayload } from "@/components/crm/CreateTaskModal";
 import { DisqualifyModal } from "@/components/crm/DisqualifyModal";
+import { InvestigationOpinionModal } from "@/components/crm/InvestigationOpinionModal";
 import { LogInteractionModal, type LogInteractionSuccessPayload } from "@/components/crm/LogInteractionModal";
 import { useScopedSearch } from "@/components/layout/SearchProvider";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +33,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getInteractionDisplayLabel } from "@/lib/crm-interaction-labels";
 import { matchesSearch } from "@/lib/search";
 
 const ITEMS_PER_PAGE = 10;
@@ -119,6 +121,10 @@ function getOutcomeAccent(outcome: ProspectingInteractionItem["outcome"]) {
   }
 }
 
+function getInteractionTypeLabel(interaction: ProspectingInteractionItem) {
+  return getInteractionDisplayLabel(interaction);
+}
+
 function toDate(value: Date | string | null | undefined) {
   if (!value) return null;
   return value instanceof Date ? value : new Date(value);
@@ -199,8 +205,352 @@ function getBestOpportunityContact(company: ProspectingCompanyItem) {
     || null;
 }
 
+type ProspectingSession = ReturnType<typeof getSession>;
+type ProspectingReadiness = ReturnType<typeof getReadiness>;
+type OpinionSuccessPayload = {
+  researchPriority: ProspectingCompanyItem["researchPriority"];
+  researchEffort: ProspectingCompanyItem["researchEffort"];
+  researchStatus: ProspectingCompanyItem["researchStatus"];
+  researchSourceChannel: ProspectingCompanyItem["researchSourceChannel"];
+  researchLastFinding: ProspectingCompanyItem["researchLastFinding"];
+  researchSummary: ProspectingCompanyItem["researchSummary"];
+  researchNextAction: ProspectingCompanyItem["researchNextAction"];
+  researchLastReviewedAt: Date;
+  interaction?: ProspectingInteractionItem;
+};
+
+function ProspectingExpandedPanel({
+  item,
+  todayDate,
+  session,
+  readiness,
+  onOpenSession,
+  onFinishCurrentContact,
+  onInteractionSuccess,
+  onTaskSuccess,
+  onOpinionSuccess,
+  onRemoveContactChannel,
+  onPostponeCompany,
+}: {
+  item: ProspectingCompanyView;
+  todayDate: string;
+  session: ProspectingSession;
+  readiness: ProspectingReadiness;
+  onOpenSession: (companyId: string, contactId?: string) => void;
+  onFinishCurrentContact: (companyId: string) => void;
+  onInteractionSuccess: (companyId: string, payload: LogInteractionSuccessPayload) => void;
+  onTaskSuccess: (companyId: string, payload: CreateTaskSuccessPayload) => void;
+  onOpinionSuccess: (companyId: string, payload: OpinionSuccessPayload) => void;
+  onRemoveContactChannel: (companyId: string, contactId: string, type: "email" | "phone", value: string) => void;
+  onPostponeCompany: (companyId: string, payload: CreateTaskSuccessPayload) => void;
+}) {
+  const { company, allInteractions, nextTask } = item;
+  const currentContact = session.currentContact;
+  const quoteRequested = allInteractions.some((interaction) => interaction.outcome === "REQUESTED_QUOTE");
+
+  return (
+    <div className="space-y-4 px-3 py-4 sm:px-5 lg:px-6">
+      <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+        <ProspectingSessionPanel
+          company={company}
+          nextTask={nextTask}
+          quoteRequested={quoteRequested}
+          readiness={readiness}
+          session={session}
+          currentContact={currentContact}
+          onOpenSession={onOpenSession}
+          onFinishCurrentContact={onFinishCurrentContact}
+          onInteractionSuccess={onInteractionSuccess}
+          onTaskSuccess={onTaskSuccess}
+          onRemoveContactChannel={onRemoveContactChannel}
+          onPostponeCompany={onPostponeCompany}
+        />
+
+        <ProspectingInteractionHistoryPanel
+          allInteractions={allInteractions}
+          todayDate={todayDate}
+        />
+      </div>
+
+      <ProspectingOpinionPanel
+        company={company}
+        onOpinionSuccess={onOpinionSuccess}
+      />
+    </div>
+  );
+}
+
+function ProspectingSessionPanel({
+  company,
+  nextTask,
+  quoteRequested,
+  readiness,
+  session,
+  currentContact,
+  onOpenSession,
+  onFinishCurrentContact,
+  onInteractionSuccess,
+  onTaskSuccess,
+  onRemoveContactChannel,
+  onPostponeCompany,
+}: {
+  company: ProspectingCompanyItem;
+  nextTask: ProspectingCompanyView["nextTask"];
+  quoteRequested: boolean;
+  readiness: ProspectingReadiness;
+  session: ProspectingSession;
+  currentContact: ProspectingSession["currentContact"];
+  onOpenSession: (companyId: string, contactId?: string) => void;
+  onFinishCurrentContact: (companyId: string) => void;
+  onInteractionSuccess: (companyId: string, payload: LogInteractionSuccessPayload) => void;
+  onTaskSuccess: (companyId: string, payload: CreateTaskSuccessPayload) => void;
+  onRemoveContactChannel: (companyId: string, contactId: string, type: "email" | "phone", value: string) => void;
+  onPostponeCompany: (companyId: string, payload: CreateTaskSuccessPayload) => void;
+}) {
+  return (
+    <section className="space-y-4 rounded-2xl border border-primary/15 bg-gradient-to-br from-background to-primary/[0.03] p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Sesion de caceria</h4>
+          <p className="mt-1 text-sm text-muted-foreground">El bloque principal del hunter. Aqui se ejecuta el contacto actual y se decide el siguiente paso.</p>
+        </div>
+        <Badge variant="outline" className={readiness.tone}>{readiness.label}</Badge>
+      </div>
+
+      <div className="rounded-xl border bg-background/70 p-3">
+        <div className="flex items-center justify-between text-xs font-medium text-muted-foreground"><span>Avance de sesion</span><span>{session.completedContacts.length}/{session.actionableContacts.length || 0}</span></div>
+        <Progress value={session.progressValue} className="mt-2" />
+        <p className="mt-2 text-xs text-muted-foreground">
+          {session.exhausted
+            ? "Ya agotaste los contactos accionables."
+            : session.currentContactCompleted
+              ? `${session.pendingContacts.length} contacto(s) pendiente(s). El ultimo contacto trabajado sigue visible por si necesitas ajustar algo.`
+              : `${session.pendingContacts.length} contacto(s) pendiente(s).`}
+        </p>
+      </div>
+
+      <div className="rounded-xl border bg-background/80 p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Contactos de la sesion</p>
+            <p className="mt-1 text-xs text-muted-foreground">Puedes elegir manualmente con quien comenzar o retomar la caceria.</p>
+          </div>
+          <Badge variant="outline">{session.actionableContacts.length} accionable(s)</Badge>
+        </div>
+        {session.actionableContacts.length > 0 ? (
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            {session.actionableContacts.map((contact) => {
+              const isCurrent = currentContact?.id === contact.id;
+              const isCompleted = session.completedContacts.some((item) => item.id === contact.id);
+              return (
+                <button
+                  key={contact.id}
+                  type="button"
+                  onClick={() => onOpenSession(company.id, contact.id)}
+                  className={`rounded-xl border p-3 text-left transition hover:border-primary/50 hover:bg-primary/[0.04] ${isCurrent ? "border-primary bg-primary/[0.06]" : "border-border bg-background"} ${isCompleted ? "opacity-90" : ""}`}
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium">{contact.firstName} {contact.lastName}</p>
+                    {isCurrent && <Badge variant="outline" className="border-primary/40 bg-primary/10 text-primary">Actual</Badge>}
+                    {isCompleted && <Badge variant="outline" className="border-emerald-300 bg-emerald-100 text-emerald-800">Trabajado</Badge>}
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Badge variant="outline" className={CONTACT_STATUS_STYLES[contact.commercialStatus]}>{CONTACT_STATUS_LABELS[contact.commercialStatus]}</Badge>
+                    <Badge variant="outline">{BUYING_ROLE_LABELS[contact.buyingRole]}</Badge>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {contact.phones.length} telefono(s) · {contact.emails.length} correo(s) {contact.linkedin ? "· LinkedIn disponible" : ""}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-muted-foreground">No hay contactos accionables disponibles para elegir.</p>
+        )}
+      </div>
+
+      {currentContact ? (
+        <div className={`rounded-2xl border p-4 ${session.currentContactCompleted ? "border-emerald-200 bg-emerald-50/60" : "border-primary/20 bg-primary/[0.06]"}`}>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <h5 className="text-lg font-semibold">{currentContact.firstName} {currentContact.lastName}</h5>
+                <Badge variant="outline" className={CONTACT_STATUS_STYLES[currentContact.commercialStatus]}>{CONTACT_STATUS_LABELS[currentContact.commercialStatus]}</Badge>
+                <Badge variant="outline">{BUYING_ROLE_LABELS[currentContact.buyingRole]}</Badge>
+                {session.currentContactCompleted && <Badge variant="outline" className="border-emerald-300 bg-emerald-100 text-emerald-800">Culminado en esta sesion</Badge>}
+                {currentContact.linkedin && <a href={currentContact.linkedin.startsWith("http") ? currentContact.linkedin : `https://${currentContact.linkedin}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800"><Linkedin className="h-4 w-4" /></a>}
+              </div>
+              <div className="grid gap-2">
+                {currentContact.phones.map((phone) => <div key={phone} className="flex items-center gap-2 rounded-lg border bg-background px-3 py-2"><PhoneCall className="h-3.5 w-3.5 text-emerald-600" /><span>{phone}</span><button type="button" className="ml-auto text-red-400 hover:text-red-600" onClick={() => onRemoveContactChannel(company.id, currentContact.id, "phone", phone)}><X className="h-3.5 w-3.5" /></button></div>)}
+                {currentContact.emails.map((email) => <div key={email} className="flex items-center gap-2 rounded-lg border bg-background px-3 py-2"><Mail className="h-3.5 w-3.5 text-blue-600" /><span className="truncate">{email}</span><button type="button" className="ml-auto text-red-400 hover:text-red-600" onClick={() => onRemoveContactChannel(company.id, currentContact.id, "email", email)}><X className="h-3.5 w-3.5" /></button></div>)}
+              </div>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2 lg:w-[320px] lg:grid-cols-1">
+              <LogInteractionModal companyId={company.id} contacts={company.contacts} defaultContactId={currentContact.id} lockedContact onSuccess={(payload) => onInteractionSuccess(company.id, payload)} triggerButton={<Button className="w-full justify-start bg-primary text-primary-foreground shadow-sm"><PhoneCall className="mr-2 h-4 w-4" /> Registrar intento</Button>} />
+              <CreateTaskModal companyId={company.id} contacts={company.contacts} defaultContactId={currentContact.id} onSuccess={(payload) => onTaskSuccess(company.id, payload)} triggerButton={<Button variant="outline" className="w-full justify-start"><CalendarClock className="mr-2 h-4 w-4" /> Crear tarea</Button>} />
+              <Button variant="outline" className="w-full justify-start" asChild><Link href={`/contacts/${currentContact.id}`}><Pencil className="mr-2 h-4 w-4" /> Corregir contacto</Link></Button>
+              {session.currentContactCompleted ? (
+                session.nextPendingContact ? (
+                  <Button variant="secondary" className="w-full justify-start" onClick={() => onOpenSession(company.id, session.nextPendingContact?.id)}><PhoneCall className="mr-2 h-4 w-4" /> Ir al siguiente pendiente</Button>
+                ) : (
+                  <Button variant="secondary" className="w-full justify-start" disabled><CheckCircle2 className="mr-2 h-4 w-4" /> Contacto ya culminado</Button>
+                )
+              ) : (
+                <Button variant="secondary" className="w-full justify-start" onClick={() => onFinishCurrentContact(company.id)}><CheckCircle2 className="mr-2 h-4 w-4" /> Terminar contacto</Button>
+              )}
+              {quoteRequested && <Button className="w-full justify-start bg-emerald-600 hover:bg-emerald-700" asChild><Link href={`/crm/opportunities/new?companyId=${company.id}&contactId=${currentContact.id}`}><TrendingUp className="mr-2 h-4 w-4" /> Abrir oportunidad ahora</Link></Button>}
+            </div>
+          </div>
+          <div className="mt-4 rounded-lg border bg-background/80 p-3 text-sm text-muted-foreground">{nextTask ? `Proximo seguimiento: ${formatDateTime(nextTask.nextFollowUpDate)}` : "Aun no hay seguimiento programado."}</div>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-dashed bg-muted/20 p-4">
+          <p className="text-sm font-medium">{session.actionableContacts.length === 0 ? "No quedan contactos accionables." : "Ya trabajaste todos los contactos accionables de esta sesion."}</p>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <CreateTaskModal companyId={company.id} contacts={company.contacts} defaultContactId="none" isSimplePostpone onSuccess={(payload) => onPostponeCompany(company.id, payload)} triggerButton={<Button><Calendar className="mr-2 h-4 w-4" /> Posponer cuenta</Button>} />
+            <Button variant="outline" asChild><Link href={`/contacts/new?companyId=${company.id}`}><Plus className="mr-2 h-4 w-4" /> Anadir contacto</Link></Button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ProspectingInteractionHistoryPanel({
+  allInteractions,
+  todayDate,
+}: {
+  allInteractions: ProspectingInteractionItem[];
+  todayDate: string;
+}) {
+  return (
+    <section className="rounded-2xl border bg-background p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Historial de interacciones</h4>
+          <p className="mt-1 text-sm text-muted-foreground">Tu memoria operativa inmediata. Antes de volver a llamar, mira esto.</p>
+        </div>
+        <Badge variant="outline">{allInteractions.length} registro(s)</Badge>
+      </div>
+      <div className="mt-4 max-h-[34rem] space-y-3 overflow-y-auto pr-1">
+        {allInteractions.length === 0 ? (
+          <div className="rounded-lg border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">
+            Aun no hay interacciones registradas en esta cuenta.
+          </div>
+        ) : allInteractions.map((interaction) => {
+          const followUpDate = interaction.nextFollowUpDate ? toDate(interaction.nextFollowUpDate)?.toISOString().split("T")[0] ?? null : null;
+          const isOverdueFollowUp = Boolean(
+            followUpDate &&
+            followUpDate < todayDate &&
+            !interaction.isFollowUpCompleted,
+          );
+
+          return (
+            <div key={interaction.id} className={`relative overflow-hidden rounded-lg border p-3 ${getOutcomeTone(interaction.outcome)}`}>
+              <div className={`absolute inset-y-0 left-0 w-1 ${getOutcomeAccent(interaction.outcome)}`} />
+              <div className="pl-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">{getInteractionTypeLabel(interaction)}</Badge>
+                  {interaction.contact && (
+                    <Badge variant="outline">
+                      con {interaction.contact.firstName} {interaction.contact.lastName}
+                    </Badge>
+                  )}
+                  {interaction.outcome && (
+                    <Badge variant="outline" className={interaction.outcome === "REQUESTED_QUOTE" ? "border-emerald-300 bg-emerald-100 text-emerald-800" : undefined}>
+                      {OUTCOME_LABELS[interaction.outcome]}
+                    </Badge>
+                  )}
+                  {interaction.nextFollowUpDate && !interaction.isFollowUpCompleted && (
+                    <Badge variant="outline" className={isOverdueFollowUp ? "border-red-300 bg-red-100 text-red-800" : "border-amber-300 bg-amber-100 text-amber-800"}>
+                      {isOverdueFollowUp ? "Seguimiento vencido" : "Seguimiento pendiente"}
+                    </Badge>
+                  )}
+                  {interaction.outcome === "NO_RESPONSE" && (
+                    <Badge variant="outline" className="border-rose-300 bg-rose-100 text-rose-800">
+                      Reintento probable
+                    </Badge>
+                  )}
+                  <span className="text-[11px] text-muted-foreground">
+                    {formatDate(interaction.interactedAt, { day: "2-digit", month: "short", year: "numeric" })}
+                  </span>
+                </div>
+                {interaction.notes && (
+                  <p className="mt-2 text-sm text-muted-foreground">{interaction.notes}</p>
+                )}
+                {interaction.nextFollowUpDate && (
+                  <p className={`mt-2 text-xs ${isOverdueFollowUp ? "font-medium text-red-700" : "text-muted-foreground"}`}>
+                    {isOverdueFollowUp ? "Vence" : "Programado"}: {formatDateTime(interaction.nextFollowUpDate)}
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function ProspectingOpinionPanel({
+  company,
+  onOpinionSuccess,
+}: {
+  company: ProspectingCompanyItem;
+  onOpinionSuccess: (companyId: string, payload: OpinionSuccessPayload) => void;
+}) {
+  return (
+    <section className="rounded-2xl border bg-background/80 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Opinion comercial</p>
+          <p className="mt-1 text-sm text-muted-foreground">Se muestra la conclusion de investigacion para no perder el contexto comercial mientras avanzas la caceria.</p>
+        </div>
+        <InvestigationOpinionModal
+          companyId={company.id}
+          companyName={company.businessName}
+          stageContext="PROSPECTING"
+          initialPriority={company.researchPriority}
+          initialEffort={company.researchEffort}
+          initialStatus={company.researchStatus}
+          initialSourceChannel={company.researchSourceChannel}
+          initialLastFinding={company.researchLastFinding}
+          initialSummary={company.researchSummary}
+          initialNextAction={company.researchNextAction}
+          onSuccess={(payload) => onOpinionSuccess(company.id, payload)}
+          triggerButton={<Button variant="outline" size="sm">Agregar opinion</Button>}
+        />
+      </div>
+      <div className="mt-4 rounded-xl border bg-background p-4">
+        <p className="text-sm leading-6 text-foreground">
+          {company.researchSummary?.trim() || "Aun no hay opinion comercial registrada para esta cuenta."}
+        </p>
+        {(company.researchLastReviewedAt || company.researchNextAction?.trim()) && (
+          <div className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-2">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Ultima revision</p>
+              <p className="mt-1 text-sm text-muted-foreground">{formatDateTime(company.researchLastReviewedAt) || "Sin fecha"}</p>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Siguiente accion sugerida</p>
+              <p className="mt-1 text-sm text-muted-foreground">{company.researchNextAction?.trim() || "No se definio una siguiente accion desde investigacion."}</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export default function ProspectingClient({ initialCompanies }: { initialCompanies: ProspectingCompanyItem[] }) {
-  const [companies, setCompanies] = useState(initialCompanies);
+  const [companies, updateCompanies] = useOptimistic(
+    initialCompanies,
+    (
+      currentCompanies,
+      updater: (companies: ProspectingCompanyItem[]) => ProspectingCompanyItem[],
+    ) => updater(currentCompanies),
+  );
   const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
   const [sessionByCompany, setSessionByCompany] = useState<Record<string, SessionState>>({});
   const [postponedIds, setPostponedIds] = useState<Set<string>>(new Set());
@@ -208,45 +558,62 @@ export default function ProspectingClient({ initialCompanies }: { initialCompani
   const [currentPage, setCurrentPage] = useState(1);
   const todayDate = new Date().toISOString().split("T")[0];
   const { query: searchQuery } = useScopedSearch();
+  const deferredSearchQuery = useDeferredValue(searchQuery);
 
-  useEffect(() => setCompanies(initialCompanies), [initialCompanies]);
+  const grouped = useMemo(() => {
+    const nextGrouped: Record<"today" | "queue" | "exhausted" | "noNextStep", ProspectingCompanyView[]> = {
+      today: [],
+      queue: [],
+      exhausted: [],
+      noNextStep: [],
+    };
 
-  const views = companies
-    .filter((company) => company.contacts.some(hasReachableChannel) && company.opportunities.length === 0)
-    .map((company) => getView(company, todayDate));
+    for (const company of companies) {
+      if (!company.contacts.some(hasReachableChannel) || company.opportunities.length > 0) {
+        continue;
+      }
 
-  const visibleCompanies = views.filter((item) =>
-    !postponedIds.has(item.company.id) &&
-    matchesSearch(
-      searchQuery,
-      item.company.businessName,
-      item.company.documentNumber,
-      item.company.contacts.map((contact) => `${contact.firstName} ${contact.lastName} ${contact.emails.join(" ")} ${contact.phones.join(" ")} ${CONTACT_STATUS_LABELS[contact.commercialStatus]} ${BUYING_ROLE_LABELS[contact.buyingRole]}`),
-      item.allInteractions.map((interaction) => `${interaction.notes || ""} ${interaction.outcome ? OUTCOME_LABELS[interaction.outcome] : ""}`)
-    )
-  );
+      const view = getView(company, todayDate);
+      if (postponedIds.has(view.company.id)) {
+        continue;
+      }
 
-  const grouped = {
-    today: visibleCompanies.filter((item) => {
-      const session = getSession(item.company, sessionByCompany[item.company.id]);
-      return item.category === "today" && !session.exhausted;
-    }),
-    queue: visibleCompanies.filter((item) => {
-      const session = getSession(item.company, sessionByCompany[item.company.id]);
-      return !session.exhausted && (item.category === "new" || item.category === "future");
-    }),
-    exhausted: visibleCompanies.filter((item) => {
-      const session = getSession(item.company, sessionByCompany[item.company.id]);
-      return session.exhausted;
-    }),
-    noNextStep: visibleCompanies.filter((item) => {
-      const session = getSession(item.company, sessionByCompany[item.company.id]);
-      return !session.exhausted && item.category === "inactive";
-    }),
-  };
+      const matches = matchesSearch(
+        deferredSearchQuery,
+        view.company.businessName,
+        view.company.documentNumber,
+        view.company.contacts.map((contact) => `${contact.firstName} ${contact.lastName} ${contact.emails.join(" ")} ${contact.phones.join(" ")} ${CONTACT_STATUS_LABELS[contact.commercialStatus]} ${BUYING_ROLE_LABELS[contact.buyingRole]}`),
+        view.allInteractions.map((interaction) => `${interaction.notes || ""} ${interaction.outcome ? OUTCOME_LABELS[interaction.outcome] : ""}`),
+      );
+
+      if (!matches) {
+        continue;
+      }
+
+      const session = getSession(view.company, sessionByCompany[view.company.id]);
+      if (session.exhausted) {
+        nextGrouped.exhausted.push(view);
+        continue;
+      }
+
+      if (view.category === "today") {
+        nextGrouped.today.push(view);
+        continue;
+      }
+
+      if (view.category === "inactive") {
+        nextGrouped.noNextStep.push(view);
+        continue;
+      }
+
+      nextGrouped.queue.push(view);
+    }
+
+    return nextGrouped;
+  }, [companies, todayDate, postponedIds, deferredSearchQuery, sessionByCompany]);
 
   const updateCompany = (companyId: string, updater: (company: ProspectingCompanyItem) => ProspectingCompanyItem) => {
-    setCompanies((current) => current.map((company) => company.id === companyId ? updater(company) : company));
+    updateCompanies((current) => current.map((company) => company.id === companyId ? updater(company) : company));
   };
 
   const toggleExpand = (companyId: string) => {
@@ -311,6 +678,21 @@ export default function ProspectingClient({ initialCompanies }: { initialCompani
     }));
   };
 
+  const handleOpinionSuccess = (companyId: string, payload: OpinionSuccessPayload) => {
+    updateCompany(companyId, (company) => ({
+      ...company,
+      researchPriority: payload.researchPriority,
+      researchEffort: payload.researchEffort,
+      researchStatus: payload.researchStatus,
+      researchSourceChannel: payload.researchSourceChannel,
+      researchLastFinding: payload.researchLastFinding,
+      researchSummary: payload.researchSummary,
+      researchNextAction: payload.researchNextAction,
+      researchLastReviewedAt: payload.researchLastReviewedAt,
+      interactions: payload.interaction ? sortInteractions([payload.interaction, ...company.interactions]) : company.interactions,
+    }));
+  };
+
   const removeContactChannel = async (companyId: string, contactId: string, type: "email" | "phone", value: string) => {
     const result = await deleteContactInfo(contactId, type, value);
     if (!result.success) {
@@ -333,215 +715,26 @@ export default function ProspectingClient({ initialCompanies }: { initialCompani
   };
 
   const renderExpanded = (item: ProspectingCompanyView) => {
-    const { company, allInteractions, nextTask } = item;
-    const session = getSession(company, sessionByCompany[company.id]);
-    const readiness = getReadiness(company, allInteractions);
-    const currentContact = session.currentContact;
-    const quoteRequested = allInteractions.some((interaction) => interaction.outcome === "REQUESTED_QUOTE");
+    const session = getSession(item.company, sessionByCompany[item.company.id]);
+    const readiness = getReadiness(item.company, item.allInteractions);
 
     return (
-      <div className="space-y-4 px-3 py-4 sm:px-5 lg:px-6">
-        <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-          <section className="space-y-4 rounded-2xl border border-primary/15 bg-gradient-to-br from-background to-primary/[0.03] p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Sesion de caceria</h4>
-                <p className="mt-1 text-sm text-muted-foreground">El bloque principal del hunter. Aqui se ejecuta el contacto actual y se decide el siguiente paso.</p>
-              </div>
-              <Badge variant="outline" className={readiness.tone}>{readiness.label}</Badge>
-            </div>
-
-            <div className="rounded-xl border bg-background/70 p-3">
-              <div className="flex items-center justify-between text-xs font-medium text-muted-foreground"><span>Avance de sesion</span><span>{session.completedContacts.length}/{session.actionableContacts.length || 0}</span></div>
-              <Progress value={session.progressValue} className="mt-2" />
-              <p className="mt-2 text-xs text-muted-foreground">
-                {session.exhausted
-                  ? "Ya agotaste los contactos accionables."
-                  : session.currentContactCompleted
-                    ? `${session.pendingContacts.length} contacto(s) pendiente(s). El ultimo contacto trabajado sigue visible por si necesitas ajustar algo.`
-                    : `${session.pendingContacts.length} contacto(s) pendiente(s).`}
-              </p>
-            </div>
-
-            <div className="rounded-xl border bg-background/80 p-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Contactos de la sesion</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Puedes elegir manualmente con quien comenzar o retomar la caceria.</p>
-                </div>
-                <Badge variant="outline">{session.actionableContacts.length} accionable(s)</Badge>
-              </div>
-              {session.actionableContacts.length > 0 ? (
-                <div className="mt-3 grid gap-2 md:grid-cols-2">
-                  {session.actionableContacts.map((contact) => {
-                    const isCurrent = currentContact?.id === contact.id;
-                    const isCompleted = session.completedContacts.some((item) => item.id === contact.id);
-                    return (
-                      <button
-                        key={contact.id}
-                        type="button"
-                        onClick={() => openSession(company.id, contact.id)}
-                        className={`rounded-xl border p-3 text-left transition hover:border-primary/50 hover:bg-primary/[0.04] ${isCurrent ? "border-primary bg-primary/[0.06]" : "border-border bg-background"} ${isCompleted ? "opacity-90" : ""}`}
-                      >
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium">{contact.firstName} {contact.lastName}</p>
-                          {isCurrent && <Badge variant="outline" className="border-primary/40 bg-primary/10 text-primary">Actual</Badge>}
-                          {isCompleted && <Badge variant="outline" className="border-emerald-300 bg-emerald-100 text-emerald-800">Trabajado</Badge>}
-                        </div>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <Badge variant="outline" className={CONTACT_STATUS_STYLES[contact.commercialStatus]}>{CONTACT_STATUS_LABELS[contact.commercialStatus]}</Badge>
-                          <Badge variant="outline">{BUYING_ROLE_LABELS[contact.buyingRole]}</Badge>
-                        </div>
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          {contact.phones.length} telefono(s) · {contact.emails.length} correo(s) {contact.linkedin ? "· LinkedIn disponible" : ""}
-                        </p>
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="mt-3 text-sm text-muted-foreground">No hay contactos accionables disponibles para elegir.</p>
-              )}
-            </div>
-
-            {currentContact ? (
-              <div className={`rounded-2xl border p-4 ${session.currentContactCompleted ? "border-emerald-200 bg-emerald-50/60" : "border-primary/20 bg-primary/[0.06]"}`}>
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h5 className="text-lg font-semibold">{currentContact.firstName} {currentContact.lastName}</h5>
-                      <Badge variant="outline" className={CONTACT_STATUS_STYLES[currentContact.commercialStatus]}>{CONTACT_STATUS_LABELS[currentContact.commercialStatus]}</Badge>
-                      <Badge variant="outline">{BUYING_ROLE_LABELS[currentContact.buyingRole]}</Badge>
-                      {session.currentContactCompleted && <Badge variant="outline" className="border-emerald-300 bg-emerald-100 text-emerald-800">Culminado en esta sesion</Badge>}
-                      {currentContact.linkedin && <a href={currentContact.linkedin.startsWith("http") ? currentContact.linkedin : `https://${currentContact.linkedin}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800"><Linkedin className="h-4 w-4" /></a>}
-                    </div>
-                    <div className="grid gap-2">
-                      {currentContact.phones.map((phone) => <div key={phone} className="flex items-center gap-2 rounded-lg border bg-background px-3 py-2"><PhoneCall className="h-3.5 w-3.5 text-emerald-600" /><span>{phone}</span><button type="button" className="ml-auto text-red-400 hover:text-red-600" onClick={() => removeContactChannel(company.id, currentContact.id, "phone", phone)}><X className="h-3.5 w-3.5" /></button></div>)}
-                      {currentContact.emails.map((email) => <div key={email} className="flex items-center gap-2 rounded-lg border bg-background px-3 py-2"><Mail className="h-3.5 w-3.5 text-blue-600" /><span className="truncate">{email}</span><button type="button" className="ml-auto text-red-400 hover:text-red-600" onClick={() => removeContactChannel(company.id, currentContact.id, "email", email)}><X className="h-3.5 w-3.5" /></button></div>)}
-                    </div>
-                  </div>
-                  <div className="grid gap-2 sm:grid-cols-2 lg:w-[320px] lg:grid-cols-1">
-                    <LogInteractionModal companyId={company.id} contacts={company.contacts} defaultContactId={currentContact.id} lockedContact onSuccess={(payload) => handleInteractionSuccess(company.id, payload)} triggerButton={<Button className="w-full justify-start bg-primary text-primary-foreground shadow-sm"><PhoneCall className="mr-2 h-4 w-4" /> Registrar intento</Button>} />
-                    <CreateTaskModal companyId={company.id} contacts={company.contacts} defaultContactId={currentContact.id} onSuccess={(payload) => handleTaskSuccess(company.id, payload)} triggerButton={<Button variant="outline" className="w-full justify-start"><CalendarClock className="mr-2 h-4 w-4" /> Crear tarea</Button>} />
-                    <Button variant="outline" className="w-full justify-start" asChild><Link href={`/contacts/${currentContact.id}`}><Pencil className="mr-2 h-4 w-4" /> Corregir contacto</Link></Button>
-                    {session.currentContactCompleted ? (
-                      session.nextPendingContact ? (
-                        <Button variant="secondary" className="w-full justify-start" onClick={() => openSession(company.id, session.nextPendingContact?.id)}><PhoneCall className="mr-2 h-4 w-4" /> Ir al siguiente pendiente</Button>
-                      ) : (
-                        <Button variant="secondary" className="w-full justify-start" disabled><CheckCircle2 className="mr-2 h-4 w-4" /> Contacto ya culminado</Button>
-                      )
-                    ) : (
-                      <Button variant="secondary" className="w-full justify-start" onClick={() => finishCurrentContact(company.id)}><CheckCircle2 className="mr-2 h-4 w-4" /> Terminar contacto</Button>
-                    )}
-                    {quoteRequested && <Button className="w-full justify-start bg-emerald-600 hover:bg-emerald-700" asChild><Link href={`/crm/opportunities/new?companyId=${company.id}&contactId=${currentContact.id}`}><TrendingUp className="mr-2 h-4 w-4" /> Abrir oportunidad ahora</Link></Button>}
-                  </div>
-                </div>
-                <div className="mt-4 rounded-lg border bg-background/80 p-3 text-sm text-muted-foreground">{nextTask ? `Proximo seguimiento: ${formatDateTime(nextTask.nextFollowUpDate)}` : "Aun no hay seguimiento programado."}</div>
-              </div>
-            ) : (
-              <div className="rounded-xl border border-dashed bg-muted/20 p-4">
-                <p className="text-sm font-medium">{session.actionableContacts.length === 0 ? "No quedan contactos accionables." : "Ya trabajaste todos los contactos accionables de esta sesion."}</p>
-                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                  <CreateTaskModal companyId={company.id} contacts={company.contacts} defaultContactId="none" isSimplePostpone onSuccess={(payload) => { handleTaskSuccess(company.id, payload); setPostponedIds((current) => new Set(current).add(company.id)); }} triggerButton={<Button><Calendar className="mr-2 h-4 w-4" /> Posponer cuenta</Button>} />
-                  <Button variant="outline" asChild><Link href={`/contacts/new?companyId=${company.id}`}><Plus className="mr-2 h-4 w-4" /> Anadir contacto</Link></Button>
-                </div>
-              </div>
-            )}
-          </section>
-
-          <section className="rounded-2xl border bg-background p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Historial de interacciones</h4>
-                <p className="mt-1 text-sm text-muted-foreground">Tu memoria operativa inmediata. Antes de volver a llamar, mira esto.</p>
-              </div>
-              <Badge variant="outline">{allInteractions.length} registro(s)</Badge>
-            </div>
-              <div className="mt-4 max-h-[34rem] space-y-3 overflow-y-auto pr-1">
-                {allInteractions.length === 0 ? (
-                  <div className="rounded-lg border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">
-                    Aun no hay interacciones registradas en esta cuenta.
-                  </div>
-                ) : allInteractions.map((interaction) => {
-                  const followUpDate = interaction.nextFollowUpDate ? toDate(interaction.nextFollowUpDate)?.toISOString().split("T")[0] ?? null : null;
-                  const isOverdueFollowUp = Boolean(
-                    followUpDate &&
-                    followUpDate < todayDate &&
-                    !interaction.isFollowUpCompleted
-                  );
-
-                  return (
-                    <div key={interaction.id} className={`relative overflow-hidden rounded-lg border p-3 ${getOutcomeTone(interaction.outcome)}`}>
-                      <div className={`absolute inset-y-0 left-0 w-1 ${getOutcomeAccent(interaction.outcome)}`} />
-                      <div className="pl-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge variant="outline">{interaction.type}</Badge>
-                          {interaction.contact && (
-                            <Badge variant="outline">
-                              con {interaction.contact.firstName} {interaction.contact.lastName}
-                            </Badge>
-                          )}
-                          {interaction.outcome && (
-                            <Badge variant="outline" className={interaction.outcome === "REQUESTED_QUOTE" ? "border-emerald-300 bg-emerald-100 text-emerald-800" : undefined}>
-                              {OUTCOME_LABELS[interaction.outcome]}
-                            </Badge>
-                          )}
-                          {interaction.nextFollowUpDate && !interaction.isFollowUpCompleted && (
-                            <Badge variant="outline" className={isOverdueFollowUp ? "border-red-300 bg-red-100 text-red-800" : "border-amber-300 bg-amber-100 text-amber-800"}>
-                              {isOverdueFollowUp ? "Seguimiento vencido" : "Seguimiento pendiente"}
-                            </Badge>
-                          )}
-                          {interaction.outcome === "NO_RESPONSE" && (
-                            <Badge variant="outline" className="border-rose-300 bg-rose-100 text-rose-800">
-                              Reintento probable
-                            </Badge>
-                          )}
-                          <span className="text-[11px] text-muted-foreground">
-                            {formatDate(interaction.interactedAt, { day: "2-digit", month: "short", year: "numeric" })}
-                          </span>
-                        </div>
-                        {interaction.notes && (
-                          <p className="mt-2 text-sm text-muted-foreground">{interaction.notes}</p>
-                        )}
-                        {interaction.nextFollowUpDate && (
-                          <p className={`mt-2 text-xs ${isOverdueFollowUp ? "font-medium text-red-700" : "text-muted-foreground"}`}>
-                            {isOverdueFollowUp ? "Vence" : "Programado"}: {formatDateTime(interaction.nextFollowUpDate)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-        </div>
-
-        <section className="rounded-2xl border bg-background/80 p-4">
-          <div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Opinion comercial</p>
-              <p className="mt-1 text-sm text-muted-foreground">Se muestra la conclusion de investigacion para no perder el contexto comercial mientras avanzas la caceria.</p>
-            </div>
-          </div>
-          <div className="mt-4 rounded-xl border bg-background p-4">
-            <p className="text-sm leading-6 text-foreground">
-              {company.researchSummary?.trim() || "Aun no hay opinion comercial registrada para esta cuenta."}
-            </p>
-            {(company.researchLastReviewedAt || company.researchNextAction?.trim()) && (
-              <div className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-2">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Ultima revision</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{formatDateTime(company.researchLastReviewedAt) || "Sin fecha"}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Siguiente accion sugerida</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{company.researchNextAction?.trim() || "No se definio una siguiente accion desde investigacion."}</p>
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
-      </div>
+      <ProspectingExpandedPanel
+        item={item}
+        todayDate={todayDate}
+        session={session}
+        readiness={readiness}
+        onOpenSession={openSession}
+        onFinishCurrentContact={finishCurrentContact}
+        onInteractionSuccess={handleInteractionSuccess}
+        onTaskSuccess={handleTaskSuccess}
+        onOpinionSuccess={handleOpinionSuccess}
+        onRemoveContactChannel={removeContactChannel}
+        onPostponeCompany={(companyId, payload) => {
+          handleTaskSuccess(companyId, payload);
+          setPostponedIds((current) => new Set(current).add(companyId));
+        }}
+      />
     );
   };
 

@@ -13,9 +13,8 @@ import { matchesSearch } from "@/lib/search";
 
 type InvestigationFilter =
     | "all"
-    | "contact-no-opinion"
     | "no-contact"
-    | "opinion-no-contact"
+    | "with-opinion"
     | "blocked";
 
 const PRIORITY_STYLES = {
@@ -132,36 +131,21 @@ function getOperationalRead(company: InvestigationCompanyItem) {
 
 function getInvestigationFlowMessage(company: InvestigationCompanyItem) {
     const activeContacts = company.contacts.filter((contact) => contact.isActive);
-    const hasOpinion = hasResearchOpinion(company);
-
-    if (activeContacts.length === 0 && !hasOpinion) {
-        return {
-            tone: "border-slate-200 bg-slate-50 text-slate-700",
-            title: "Falta contacto y opinion comercial",
-            body: "Primero carga los contactos disponibles y luego registra la opinion comercial para dejar lista la cuenta para caceria.",
-        };
-    }
 
     if (activeContacts.length === 0) {
         return {
             tone: "border-amber-200 bg-amber-50 text-amber-900",
             title: "Falta al menos un contacto",
-            body: "La opinion ya esta registrada, pero esta cuenta seguira en investigacion hasta que cargues un contacto para iniciar caceria.",
-        };
-    }
-
-    if (!hasOpinion) {
-        return {
-            tone: "border-blue-200 bg-blue-50 text-blue-900",
-            title: "Falta registrar la opinion comercial",
-            body: "Ya tienes contactos cargados. Resume lo encontrado en la base de importaciones y define la prioridad para que la cuenta pase a caceria.",
+            body: "Investigacion solo necesita dejar al menos un contacto activo. La opinion comercial aqui es opcional y tambien puede registrarse despues desde caceria.",
         };
     }
 
     return {
         tone: "border-emerald-200 bg-emerald-50 text-emerald-900",
         title: "Lista para pasar a caceria",
-        body: "Esta cuenta ya tiene contactos cargados y opinion comercial. En cuanto refresque la bandeja, saldra de investigacion.",
+        body: hasResearchOpinion(company)
+            ? "Esta cuenta ya tiene contacto activo y opinion comercial. En cuanto refresque la bandeja, saldra de investigacion."
+            : "Esta cuenta ya tiene contacto activo. En cuanto refresque la bandeja, saldra de investigacion y podras completar la opinion comercial desde caceria.",
     };
 }
 
@@ -179,12 +163,10 @@ function matchesInvestigationFilter(company: InvestigationCompanyItem, filter: I
     const isBlocked = company.researchStatus === "BLOCKED" || company.researchStatus === "VISIT_REQUIRED";
 
     switch (filter) {
-        case "contact-no-opinion":
-            return activeContacts && !hasOpinion;
         case "no-contact":
             return !activeContacts;
-        case "opinion-no-contact":
-            return hasOpinion && !activeContacts;
+        case "with-opinion":
+            return hasOpinion;
         case "blocked":
             return isBlocked;
         case "all":
@@ -247,9 +229,8 @@ export default function InvestigationClient({ initialCompanies }: { initialCompa
     const filterCounts = useMemo(
         () => ({
             all: searchedCompanies.length,
-            "contact-no-opinion": searchedCompanies.filter((company) => matchesInvestigationFilter(company, "contact-no-opinion")).length,
             "no-contact": searchedCompanies.filter((company) => matchesInvestigationFilter(company, "no-contact")).length,
-            "opinion-no-contact": searchedCompanies.filter((company) => matchesInvestigationFilter(company, "opinion-no-contact")).length,
+            "with-opinion": searchedCompanies.filter((company) => matchesInvestigationFilter(company, "with-opinion")).length,
             blocked: searchedCompanies.filter((company) => matchesInvestigationFilter(company, "blocked")).length,
         }),
         [searchedCompanies]
@@ -279,14 +260,14 @@ export default function InvestigationClient({ initialCompanies }: { initialCompa
                         Bandeja de Investigacion
                     </h1>
                     <p className="mt-1 max-w-4xl text-muted-foreground">
-                        Investigacion debe habilitar rapido la cuenta para caceria. Aqui se actualizan <strong>incoterm</strong> y <strong>canal aduanero</strong> mas frecuentes, se cargan todos los contactos encontrados y se registra una <strong>opinion comercial breve</strong> para priorizar la primera caceria.
+                        Investigacion debe habilitar rapido la cuenta para caceria. Aqui se actualizan <strong>incoterm</strong> y <strong>canal aduanero</strong> mas frecuentes y se cargan los contactos encontrados. La <strong>opinion comercial</strong> puede registrarse aqui o despues desde caceria.
                     </p>
                 </div>
 
                 <div className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 via-white to-sky-50 p-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-700">Frontera del modulo</p>
                     <p className="mt-1 text-sm text-slate-700">
-                        La validacion fina del contacto ya corresponde a caceria. En investigacion basta con cargar los contactos encontrados y registrar la opinion comercial para que la cuenta salga de esta bandeja.
+                        La validacion fina del contacto y el afinamiento de criterio comercial ya corresponden a caceria. En investigacion basta con dejar al menos un contacto activo para que la cuenta salga de esta bandeja.
                     </p>
                 </div>
             </div>
@@ -301,8 +282,8 @@ export default function InvestigationClient({ initialCompanies }: { initialCompa
                     <p className="mt-2 text-2xl font-semibold">{filteredCompanies.filter((company) => hasActiveContacts(company)).length}</p>
                 </div>
                 <div className="rounded-2xl border bg-card p-4 shadow-sm">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Falta opinion</p>
-                    <p className="mt-2 text-2xl font-semibold">{filteredCompanies.filter((company) => !hasResearchOpinion(company)).length}</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Con opinion</p>
+                    <p className="mt-2 text-2xl font-semibold">{filteredCompanies.filter((company) => hasResearchOpinion(company)).length}</p>
                 </div>
                 <div className="rounded-2xl border bg-card p-4 shadow-sm">
                     <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">No ubicables o visita</p>
@@ -321,13 +302,6 @@ export default function InvestigationClient({ initialCompanies }: { initialCompa
                     Todos ({filterCounts.all})
                 </Button>
                 <Button
-                    variant={activeFilter === "contact-no-opinion" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setActiveFilter("contact-no-opinion")}
-                >
-                    Con contacto sin opinion ({filterCounts["contact-no-opinion"]})
-                </Button>
-                <Button
                     variant={activeFilter === "no-contact" ? "default" : "outline"}
                     size="sm"
                     onClick={() => setActiveFilter("no-contact")}
@@ -335,11 +309,11 @@ export default function InvestigationClient({ initialCompanies }: { initialCompa
                     Sin contactos ({filterCounts["no-contact"]})
                 </Button>
                 <Button
-                    variant={activeFilter === "opinion-no-contact" ? "default" : "outline"}
+                    variant={activeFilter === "with-opinion" ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setActiveFilter("opinion-no-contact")}
+                    onClick={() => setActiveFilter("with-opinion")}
                 >
-                    Con opinion sin contacto ({filterCounts["opinion-no-contact"]})
+                    Con opinion ({filterCounts["with-opinion"]})
                 </Button>
                 <Button
                     variant={activeFilter === "blocked" ? "default" : "outline"}
@@ -524,6 +498,7 @@ export default function InvestigationClient({ initialCompanies }: { initialCompa
                                     <InvestigationOpinionModal
                                         companyId={company.id}
                                         companyName={company.businessName}
+                                        stageContext="INVESTIGATION"
                                         initialPriority={company.researchPriority}
                                         initialEffort={company.researchEffort}
                                         initialStatus={company.researchStatus}
@@ -537,10 +512,7 @@ export default function InvestigationClient({ initialCompanies }: { initialCompa
                                                     if (item.id !== company.id) return [item];
 
                                                     const updatedItem = { ...item, ...payload };
-                                                    const shouldMoveToProspecting =
-                                                        updatedItem.contacts.some((contact) => contact.isActive) &&
-                                                        Boolean(updatedItem.researchSummary?.trim()) &&
-                                                        Boolean(updatedItem.researchLastReviewedAt);
+                                                    const shouldMoveToProspecting = updatedItem.contacts.some((contact) => contact.isActive);
 
                                                     return shouldMoveToProspecting ? [] : [updatedItem];
                                                 })
